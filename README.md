@@ -8,7 +8,7 @@ Targets **minimal, unique** puzzles (17-clue hunt capable).
 [![CI](https://github.com/SaridakisStamatisChristos/sudoku_dlx/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SaridakisStamatisChristos/sudoku_dlx/actions/workflows/ci.yml)
 [![Codecov](https://codecov.io/gh/SaridakisStamatisChristos/sudoku_dlx/branch/main/graph/badge.svg)](https://codecov.io/gh/SaridakisStamatisChristos/sudoku_dlx)
 [![License: MIT](https://img.shields.io/github/license/SaridakisStamatisChristos/sudoku_dlx.svg)](LICENSE)
-[![PyPI version](https://img.shields.io/pypi/v/sudoku-dlx-bitset.svg)](https://pypi.org/project/sudoku-dlx-bitset/)
+[![PyPI version](https://img.shields.io/pypi/v/sudoku_dlx.svg)](https://pypi.org/project/sudoku_dlx/)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-demo-blue)](https://SaridakisStamatisChristos.github.io/sudoku_dlx/)
 
 ## Features
