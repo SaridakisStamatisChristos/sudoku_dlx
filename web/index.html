@@ -44,10 +44,14 @@
       for(let i=0;i<81;i++){ cells[i].value = v[i]?String(v[i]):''; }
     }
 
+    const PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/";
     let pyodideReady = (async ()=>{
-      const py = await loadPyodide();
-      await py.loadPackage([]);
-      const code = `
+      try {
+        log("Downloading Pyodide runtime...");
+        const py = await loadPyodide({ indexURL: PYODIDE_INDEX_URL });
+        log("Initializing solver...");
+        await py.loadPackage([]);
+        const code = `
 from typing import List, Tuple
 def col_cell(r, c): return r*9 + c
 def col_row(r, v):  return 81  + r*9 + (v-1)
@@ -134,14 +138,26 @@ def parse_linear(vals):
     return g
 def clues_from_grid(g):
     return [(r,c,g[r][c]) for r in range(9) for c in range(9) if g[r][c]!=0]
-`);
-      py.runPython(code);
-      return py;
+`;
+        py.runPython(code);
+        log("Pyodide ready. Enter digits and press Solve.");
+        return py;
+      } catch (err) {
+        console.error("Failed to load Pyodide", err);
+        log("Failed to load Pyodide. See console for details.");
+        throw err;
+      }
     })();
 
     function log(msg){ logEl.textContent = msg; }
     document.getElementById('solveBtn').onclick = async ()=>{
-      const py = await pyodideReady;
+      let py;
+      try {
+        py = await pyodideReady;
+      } catch (err) {
+        log("Pyodide is not available.");
+        return;
+      }
       const v = readGrid();
       log("Solving...");
       py.globals.set("vals", v);
@@ -161,7 +177,13 @@ cnt, sol
       log("Solved. Solutions="+cnt);
     };
     document.getElementById('clearBtn').onclick = ()=>{ writeGrid(Array(81).fill(0)); log("Cleared."); };
-    document.getElementById('sampleBtn').onclick = ()=>{
+    document.getElementById('sampleBtn').onclick = async ()=>{
+      try {
+        await pyodideReady;
+      } catch (err) {
+        log("Cannot load sample because Pyodide failed to initialize.");
+        return;
+      }
       const s=("53..7...."+"6..195..."+".98....6."+"8...6...3"+"4..8.3..1"+"7...2...6"+".6....28."+"...419..5"+"....8..79");
       const arr=[...s].map(ch=> ch==='.'?0:parseInt(ch,10)); writeGrid(arr); log("Loaded sample.");
     };
