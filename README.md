@@ -83,7 +83,7 @@ MIT — see LICENSE.
 ## Publish to PyPI
 
 This repository is already structured as a Python package (`src` layout, metadata in `pyproject.toml`).
-To publish a new version on [PyPI](https://pypi.org/project/sudoku-dlx-bitset/):
+To publish a new version on [PyPI](https://pypi.org/project/sudoku_dlx/):
 
 1. Update `pyproject.toml` with the new `version` and adjust the changelog/release notes.
 2. Make sure the build backend is installed, then build the distribution artifacts:
