@@ -1,7 +1,6 @@
 # sudoku_dlx
 
-Fast **Sudoku** solver & generator using **Algorithm X / Dancing Links** with **Python bitsets** + incremental cover.
-Targets **minimal, unique** puzzles (17-clue hunt capable).
+Fast **Sudoku** solver & generator using **Algorithm X / Dancing Links (DLX)** with Python bitsets and an incremental cover model. Exposes timing & search stats for reproducible benchmarking. Runs in the browser via Pyodide (demo linked below).
 
 > © 2025 Stamatis-Christos Saridakis — MIT. Core algorithm: exact cover (Knuth). This implementation is original and bitset-based.
 
@@ -9,19 +8,21 @@ Targets **minimal, unique** puzzles (17-clue hunt capable).
 [![Codecov](https://codecov.io/gh/SaridakisStamatisChristos/sudoku_dlx/branch/main/graph/badge.svg)](https://codecov.io/gh/SaridakisStamatisChristos/sudoku_dlx)
 [![License: MIT](https://img.shields.io/github/license/SaridakisStamatisChristos/sudoku_dlx.svg)](LICENSE)
 [![PyPI version](https://img.shields.io/pypi/v/sudoku_dlx.svg)](https://pypi.org/project/sudoku_dlx/)
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-demo-blue)](https://SaridakisStamatisChristos.github.io/sudoku_dlx/)
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-demo-blue)](https://saridakisstamatischristos.github.io/sudoku_dlx/)
 
 ## Features
-- Bitset DLX (no pointer structs), precomputed 729×324 exact-cover matrix
-- Reusable solver state for fast uniqueness checks
-- Generator with symmetry knobs (`rot180`, `none`, `mix`) and aggressive thinning
-- Cheap **naked-singles prepass** for speed; **search stats** exposed
-- Clean CLI + tests + CI + pre-commit hooks + web demo
+- Exact-cover Sudoku with **DLX** (no pointer structs; compact bitset encoding).
+- **Stats exposed**: elapsed ms, node visits, backtracks.
+- **Generator**: deterministic with `--seed`; removes clues while preserving **unique solvability** near a target clue count.
+- **Difficulty rater**: quick heuristic in `[0, 10]` from givens + search effort.
+- **CLI** (`sudoku-dlx`) + typed API + tests + CI + web demo.
+
+> Note: Current generator aims for *unique* puzzles near `target_givens`; **minimality** and **symmetry options** are planned (see Roadmap).
 
 ## Install (dev)
 ```bash
 git clone https://github.com/SaridakisStamatisChristos/sudoku_dlx.git
-cd sudoku-dlx
+cd sudoku_dlx
 python -m venv .venv && source .venv/bin/activate  # Windows: .\.venv\Scripts\activate
 pip install -e ".[dev]"
 pre-commit install
