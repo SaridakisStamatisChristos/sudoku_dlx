@@ -2,9 +2,8 @@ cff-version: 1.2.0
 message: If you use this software, please cite it as below.
 title: sudoku-dlx-bitset
 authors:
-  - family-names: Saridakis
-    given-names: Stamatis-Christos
+Saridakis Stamatis-Christos
 date-released: 2025-09-27
-repository-code: https://github.com/<your-username>/sudoku-dlx-bitset
+repository-code: https://github.com/SaridakisStamatisChristos/sudoku-dlx-bitset
 license: MIT
 version: 0.1.0
