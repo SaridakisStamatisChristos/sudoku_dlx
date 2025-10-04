@@ -7,7 +7,7 @@ name = "sudoku-dlx-bitset"
 version = "0.1.0"
 description = "Fast Sudoku DLX (Algorithm X) with Python bitsets; generator for minimal unique puzzles."
 readme = "README.md"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 authors = [{ name = "Stamatis-Christos Saridakis" }]
 requires-python = ">=3.10"
 dependencies = []
