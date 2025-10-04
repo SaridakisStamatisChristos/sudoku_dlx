@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sudoku DLX Bitset — Web Demo</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem;color:#111;background:#fafafa}
+    .grid{display:grid;grid-template-columns:repeat(9,2.2rem);gap:2px;margin:1rem 0}
+    input.cell{width:2.2rem;height:2.2rem;text-align:center;font-size:1.1rem;border:1px solid #ccc;background:#fff}
+    button{padding:.6rem .9rem;margin-right:.5rem;border:0;border-radius:.5rem;background:#111;color:#fff;cursor:pointer}
+    button.secondary{background:#555}
+    .log{white-space:pre-wrap;background:#fff;border:1px solid #ddd;padding:.8rem;border-radius:.5rem}
+    .foot{margin-top:1rem;color:#666;font-size:.9rem}
+  </style>
+</head>
+<body>
+  <h1>Sudoku DLX Bitset — Web Demo</h1>
+  <p>Enter digits (1–9), leave blanks empty. Solve runs in your browser via <a href="https://pyodide.org/" target="_blank">Pyodide</a>.</p>
+  <div id="grid" class="grid"></div>
+  <div>
+    <button id="solveBtn">Solve</button>
+    <button id="clearBtn" class="secondary">Clear</button>
+    <button id="sampleBtn" class="secondary">Load Sample</button>
+  </div>
+  <h3>Log</h3>
+  <div id="log" class="log">Loading Pyodide...</div>
+  <div class="foot">Algorithm: Exact cover (Algorithm X / DLX). Implementation © 2025 Stamatis-Christos Saridakis — MIT.</div>
+
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
+  <script>
+    const gridEl = document.getElementById('grid');
+    const logEl = document.getElementById('log');
+    function mkCell(){ const i=document.createElement('input'); i.className='cell'; i.maxLength=1; i.pattern='[1-9]'; i.inputMode='numeric'; return i; }
+    for(let r=0;r<9;r++){ for(let c=0;c<9;c++){ gridEl.appendChild(mkCell()); }}
+
+    function readGrid(){
+      const v=[]; const cells=[...gridEl.querySelectorAll('input.cell')];
+      for(let i=0;i<81;i++){ const ch=cells[i].value.trim(); v.push(ch?parseInt(ch,10):0); }
+      return v;
+    }
+    function writeGrid(v){
+      const cells=[...gridEl.querySelectorAll('input.cell')];
+      for(let i=0;i<81;i++){ cells[i].value = v[i]?String(v[i]):''; }
+    }
+
+    let pyodideReady = (async ()=>{
+      const py = await loadPyodide();
+      await py.loadPackage([]);
+      const code = `
+from typing import List, Tuple
+def col_cell(r, c): return r*9 + c
+def col_row(r, v):  return 81  + r*9 + (v-1)
+def col_col(c, v):  return 162 + c*9 + (v-1)
+def col_box(b, v):  return 243 + b*9 + (v-1)
+def box_of(r, c):   return (r//3)*3 + (c//3)
+ROW_COLS: List[List[int]] = []
+ROW_PAYLOAD: List[Tuple[int,int,int]] = []
+COL_ROWS_BITS: List[int] = [0]*324
+RCV_TO_ROWIDX: dict[Tuple[int,int,int], int] = {}
+def _precompute_matrix():
+    idx = 0
+    for r in range(9):
+        for c in range(9):
+            b = box_of(r, c)
+            for v in range(1,10):
+                cols = [col_cell(r,c), col_row(r,v), col_col(c,v), col_box(b,v)]
+                ROW_COLS.append(cols)
+                ROW_PAYLOAD.append((r,c,v))
+                RCV_TO_ROWIDX[(r,c,v)] = idx
+                mask = 1 << idx
+                for col in cols: COL_ROWS_BITS[col] |= mask
+                idx += 1
+_precompute_matrix()
+ALL_ROWS_MASK = (1 << 729) - 1
+ALL_COLS_MASK = (1 << 324) - 1
+def iter_set_bits(x:int):
+    while x:
+        lsb = x & -x
+        i = (lsb.bit_length()-1)
+        yield i
+        x ^= lsb
+def is_bit_set(x:int,i:int)->bool: return (x>>i)&1
+def clear_bit(x:int,i:int)->int: return x & ~(1<<i)
+class BitDLX:
+    def _choose_col(self, rows_mask:int, cols_mask:int):
+        best_col=None; best_sz=10**9
+        for c in range(324):
+            if not is_bit_set(cols_mask,c): continue
+            cand = COL_ROWS_BITS[c] & rows_mask
+            sz = cand.bit_count()
+            if sz==0: return c
+            if sz<best_sz: best_sz=sz; best_col=c
+            if sz<=1: break
+        return best_col
+    def _cover_row(self, rows_mask:int, cols_mask:int, row_idx:int):
+        cols = ROW_COLS[row_idx]
+        union_rows=0
+        for c in cols: union_rows |= (COL_ROWS_BITS[c] & rows_mask)
+        rows_mask2 = rows_mask & ~union_rows
+        for c in cols: cols_mask = clear_bit(cols_mask, c)
+        return rows_mask2, cols_mask
+    def _search(self, rows_mask:int, cols_mask:int, limit:int, keep_one:bool, collect_sol:list, found:list):
+        if cols_mask==0:
+            found[0]+=1; return found[0]>=limit
+        c = self._choose_col(rows_mask, cols_mask)
+        cand = COL_ROWS_BITS[c] & rows_mask
+        if cand==0: return False
+        for r in iter_set_bits(cand):
+            rows2, cols2 = self._cover_row(rows_mask, cols_mask, r)
+            if keep_one: collect_sol.append(r)
+            if self._search(rows2, cols2, limit, keep_one, collect_sol, found): return True
+            if keep_one: collect_sol.pop()
+        return False
+    def count_solutions(self, clues:list[tuple[int,int,int]], limit:int=2):
+        rows_mask = ALL_ROWS_MASK; cols_mask = ALL_COLS_MASK
+        for (r,c,v) in clues:
+            row_idx = RCV_TO_ROWIDX.get((r,c,v))
+            if row_idx is None or not is_bit_set(rows_mask, row_idx): return 0, None
+            rows_mask, cols_mask = self._cover_row(rows_mask, cols_mask, row_idx)
+        found=[0]; collect=[]
+        self._search(rows_mask, cols_mask, limit, True, collect, found)
+        if found[0]==0: return 0, None
+        grid=[[0]*9 for _ in range(9)]
+        for (rr,cc,vv) in clues: grid[rr][cc]=vv
+        for rid in collect:
+            rr,cc,vv = ROW_PAYLOAD[rid]; grid[rr][cc]=vv
+        return found[0], grid
+SOLVER = BitDLX()
+def parse_linear(vals):
+    g=[[0]*9 for _ in range(9)]
+    for i,v in enumerate(vals):
+        r,c=divmod(i,9); g[r][c]=int(v)
+    return g
+def clues_from_grid(g):
+    return [(r,c,g[r][c]) for r in range(9) for c in range(9) if g[r][c]!=0]
+`);
+      py.runPython(code);
+      return py;
+    })();
+
+    function log(msg){ logEl.textContent = msg; }
+    document.getElementById('solveBtn').onclick = async ()=>{
+      const py = await pyodideReady;
+      const v = readGrid();
+      log("Solving...");
+      py.globals.set("vals", v);
+      const out = py.runPython(`
+g = parse_linear(vals)
+cnt, sol = SOLVER.count_solutions(clues_from_grid(g), limit=2)
+cnt, sol
+`);
+      const cnt = out.get(0)
+      const sol = out.get(1)
+      if (cnt == 0){ log("No solution (contradiction)."); return; }
+      if (cnt > 1){ log("Multiple solutions ("+cnt+"). Showing one."); }
+      const js = sol.toJs();
+      const flat = [];
+      for(let r=0;r<9;r++){ for(let c=0;c<9;c++){ flat.push(js[r][c]); } }
+      writeGrid(flat);
+      log("Solved. Solutions="+cnt);
+    };
+    document.getElementById('clearBtn').onclick = ()=>{ writeGrid(Array(81).fill(0)); log("Cleared."); };
+    document.getElementById('sampleBtn').onclick = ()=>{
+      const s=("53..7...."+"6..195..."+".98....6."+"8...6...3"+"4..8.3..1"+"7...2...6"+".6....28."+"...419..5"+"....8..79");
+      const arr=[...s].map(ch=> ch==='.'?0:parseInt(ch,10)); writeGrid(arr); log("Loaded sample.");
+    };
+  </script>
+</body>
+</html>
