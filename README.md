@@ -108,6 +108,7 @@ This repository is already structured as a Python package (`src` layout, metadat
      `TWINE_USERNAME=__token__` and `TWINE_PASSWORD=${{ secrets.PYPI_API_TOKEN }}`.
 
 ### 2. Build the release artifacts
+To publish a new version on [PyPI](https://pypi.org/project/sudoku-dlx-bitset/):
 
 1. Update `pyproject.toml` with the new `version` and adjust the changelog/release notes.
 2. Make sure the build backend is installed, then build the distribution artifacts:
@@ -126,12 +127,14 @@ This repository is already structured as a Python package (`src` layout, metadat
    ```
 
 2. Upload to the main PyPI index once satisfied:
+3. Upload the artifacts with [Twine](https://twine.readthedocs.io/):
 
    ```bash
    python -m twine upload dist/*
    ```
 
 3. Tag the release in Git and push the tag so GitHub releases stay in sync.
+4. Tag the release in Git and push the tag so GitHub releases stay in sync.
 
 The CI workflow already runs tests against multiple Python versions and uploads coverage
 reports to Codecov; the `pages` workflow deploys the static demo from the `web/` directory.
