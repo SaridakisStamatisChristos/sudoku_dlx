@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sudoku-dlx-bitset"
+name = "sudoku_dlx"
 version = "0.1.0"
 description = "Fast Sudoku DLX (Algorithm X) with Python bitsets; generator for minimal unique puzzles."
 readme = "README.md"
