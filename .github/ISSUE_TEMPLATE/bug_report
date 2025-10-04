@@ -1,0 +1,25 @@
+ame: Bug report
+description: File a bug report
+labels: [bug]
+body:
+  - type: textarea
+    id: desc
+    attributes:
+      label: What happened?
+      description: Clear description and expected behavior
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal grid/CLI command(s)
+      placeholder: |
+        python -m sudoku_dlx solve --grid "..."
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      value: |
+        OS:
+        Python:
+        sudoku-dlx-bitset:
