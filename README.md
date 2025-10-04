@@ -1,4 +1,4 @@
-# sudoku-dlx-bitset
+# sudoku_dlx
 
 Fast **Sudoku** solver & generator using **Algorithm X / Dancing Links** with **Python bitsets** + incremental cover.
 Targets **minimal, unique** puzzles (17-clue hunt capable).
