@@ -5,10 +5,10 @@ Targets **minimal, unique** puzzles (17-clue hunt capable).
 
 > © 2025 Stamatis-Christos Saridakis — MIT. Core algorithm: exact cover (Knuth). This implementation is original and bitset-based.
 
-[![CI](https://github.com/<your-username>/sudoku-dlx-bitset/actions/workflows/ci.yml/badge.svg)](https://github.com/<your-username>/sudoku-dlx-bitset/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/<your-username>/sudoku-dlx-bitset/branch/main/graph/badge.svg)](https://codecov.io/gh/<your-username>/sudoku-dlx-bitset)
-[![PyPI version](https://img.shields.io/pypi/v/sudoku-dlx-bitset.svg)](https://pypi.org/project/sudoku-dlx-bitset/)
-[![pages](https://img.shields.io/badge/GitHub%20Pages-demo-blue)](https://<your-username>.github.io/sudoku-dlx-bitset/)
+[![CI](https://github.com/#SaridakisStamatisChristos/sudoku-dlx-bitset/actions/workflows/ci.yml/badge.svg)](https://github.com/<your-username>/sudoku-dlx/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/SaridakisStamatisChristos/sudoku-dlx-bitset/branch/main/graph/badge.svg)](https://codecov.io/gh/<your-username>/sudoku_dlx)
+[![PyPI version](https://img.shields.io/pypi/v/sudoku_dlx-bitset.svg)](https://pypi.org/project/sudoku_dlx/)
+[![pages](https://img.shields.io/badge/GitHubPages-demo-blue)](https://sudoku_dlx.github.io/sudoku-dlx)
 
 ## Features
 - Bitset DLX (no pointer structs), precomputed 729×324 exact-cover matrix
