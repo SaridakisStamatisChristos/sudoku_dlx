@@ -19,7 +19,7 @@ Targets **minimal, unique** puzzles (17-clue hunt capable).
 
 ## Install (dev)
 ```bash
-git clone https://github.com/<your-username>/sudoku-dlx-bitset.git
+git clone https://github.com/SaridakisStamatisChristos/sudoku_dlx.git
 cd sudoku-dlx-bitset
 python -m venv .venv && source .venv/bin/activate  # Windows: .\.venv\Scripts\activate
 pip install -e ".[dev]"
