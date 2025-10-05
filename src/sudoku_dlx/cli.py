@@ -1,4 +1,5 @@
 import argparse
+import pathlib
 import sys
 from typing import Optional
 
@@ -69,6 +70,32 @@ def cmd_canon(ns: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dedupe(ns: argparse.Namespace) -> int:
+    inp = pathlib.Path(ns.in_path)
+    outp = pathlib.Path(ns.out_path)
+    seen: set[str] = set()
+    uniq: list[str] = []
+    with inp.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            s = "".join(ch for ch in line.strip() if not ch.isspace())
+            if not s:
+                continue
+            try:
+                grid = from_string(s)
+            except Exception:
+                continue
+            canon = canonical_form(grid)
+            if canon not in seen:
+                seen.add(canon)
+                uniq.append(canon)
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    with outp.open("w", encoding="utf-8") as handle:
+        for value in uniq:
+            handle.write(value + "\n")
+    print(f"# unique: {len(uniq)}", file=sys.stderr)
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="sudoku-dlx",
@@ -88,6 +115,31 @@ def main(argv: Optional[list[str]] = None) -> int:
     rate_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
     rate_parser.set_defaults(func=cmd_rate)
 
+    canon_parser = sub.add_parser(
+        "canon",
+        help=(
+            "print canonical 81-char form (D4 × bands/stacks × inner row/col swaps × digit relabel)"
+        ),
+    )
+    canon_parser.add_argument("--grid", help="81-char string; 0/./- for blanks")
+    canon_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
+    canon_parser.set_defaults(func=cmd_canon)
+
+    dedupe_parser = sub.add_parser(
+        "dedupe",
+        help="dedupe puzzles by canonical form (one 81-char grid per line)",
+    )
+    dedupe_parser.add_argument(
+        "--in", dest="in_path", required=True, help="input text file with one grid per line"
+    )
+    dedupe_parser.add_argument(
+        "--out",
+        dest="out_path",
+        required=True,
+        help="output file path for unique canonical grids",
+    )
+    dedupe_parser.set_defaults(func=cmd_dedupe)
+
     gen_parser = sub.add_parser("gen", help="generate a puzzle")
     gen_parser.add_argument("--seed", type=int, default=None)
     gen_parser.add_argument("--givens", type=int, default=28, help="target number of clues (approx)")
@@ -104,16 +156,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     gen_parser.add_argument("--pretty", action="store_true")
     gen_parser.set_defaults(func=cmd_gen)
-
-    canon_parser = sub.add_parser(
-        "canon",
-        help=(
-            "print canonical 81-char form (D4 × bands/stacks × inner row/col swaps × digit relabel)"
-        ),
-    )
-    canon_parser.add_argument("--grid", help="81-char string; 0/./- for blanks")
-    canon_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
-    canon_parser.set_defaults(func=cmd_canon)
 
     args = parser.parse_args(argv)
     if not hasattr(args, "func"):
