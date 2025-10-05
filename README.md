@@ -57,6 +57,9 @@ sudoku-dlx dedupe --in puzzles.txt --out unique.txt
 # Generate a unique puzzle (deterministic with seed)
 sudoku-dlx gen   --seed 123 --givens 30           # ~target clue count (approx)
 sudoku-dlx gen   --seed 123 --givens 30 --pretty
+# Analyze (valid/solvable/unique/difficulty/stats/canonical)
+sudoku-dlx check --grid "<81chars>"
+sudoku-dlx check --grid "<81chars>" --json > report.json
 # Advanced generator flags:
 sudoku-dlx gen   --seed 123 --givens 28 --minimal
 sudoku-dlx gen   --seed 123 --givens 28 --symmetry rot180

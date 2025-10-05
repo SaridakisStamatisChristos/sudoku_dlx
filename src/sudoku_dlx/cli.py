@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import pathlib
 import random
 import sys
 from typing import Optional
 
-from .api import from_string, is_valid, solve, to_string
+from .api import analyze, from_string, is_valid, solve, to_string
 from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
@@ -25,6 +26,23 @@ def _read_grid_arg(ns: argparse.Namespace) -> str:
 def _print_grid(grid) -> None:
     for row in grid:
         print(" ".join(str(x) for x in row))
+
+
+def _print_analysis(data: dict) -> None:
+    def yes(b: bool) -> str:
+        return "yes" if b else "no"
+
+    print("== sudoku-dlx check ==")
+    print(f"valid:     {yes(data['valid'])}   givens: {data['givens']}")
+    print(f"solvable:  {yes(data['solvable'])}   unique: {yes(data['unique'])}")
+    print(f"difficulty:{data['difficulty']:.1f}")
+    stats = data["stats"]
+    print(
+        f"stats:     {stats['ms']} ms · nodes {stats['nodes']} · backtracks {stats['backtracks']}"
+    )
+    print(f"canonical: {data['canonical']}")
+    if data["solution"]:
+        print(f"solution:  {data['solution']}")
 
 
 def cmd_solve(ns: argparse.Namespace) -> int:
@@ -51,6 +69,16 @@ def cmd_solve(ns: argparse.Namespace) -> int:
 def cmd_rate(ns: argparse.Namespace) -> int:
     grid = from_string(_read_grid_arg(ns))
     print(rate(grid))
+    return 0
+
+
+def cmd_check(ns: argparse.Namespace) -> int:
+    grid = from_string(_read_grid_arg(ns))
+    data = analyze(grid)
+    if ns.json:
+        print(json.dumps(data, separators=(",", ":"), sort_keys=True))
+    else:
+        _print_analysis(data)
     return 0
 
 
@@ -164,6 +192,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     rate_parser.add_argument("--grid", help="81-char string; 0/./- for blanks")
     rate_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
     rate_parser.set_defaults(func=cmd_rate)
+
+    check_parser = sub.add_parser(
+        "check", help="validate/score a puzzle and show stats/canonical form"
+    )
+    check_parser.add_argument("--grid", help="81-char string; 0/./- for blanks")
+    check_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
+    check_parser.add_argument("--json", action="store_true", help="output JSON")
+    check_parser.set_defaults(func=cmd_check)
 
     canon_parser = sub.add_parser(
         "canon",

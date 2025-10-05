@@ -7,6 +7,7 @@ from .api import (
     count_solutions,
     from_string,
     is_valid,
+    analyze,
     solve,
     to_string,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "to_string",
     "is_valid",
     "solve",
+    "analyze",
     "count_solutions",
     "rate",
     "canonical_form",
