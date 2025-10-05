@@ -3,6 +3,7 @@ import sys
 from typing import Optional
 
 from .api import from_string, is_valid, solve, to_string
+from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
 
@@ -62,6 +63,12 @@ def cmd_gen(ns: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_canon(ns: argparse.Namespace) -> int:
+    grid = from_string(_read_grid_arg(ns))
+    print(canonical_form(grid))
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="sudoku-dlx",
@@ -97,6 +104,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     gen_parser.add_argument("--pretty", action="store_true")
     gen_parser.set_defaults(func=cmd_gen)
+
+    canon_parser = sub.add_parser(
+        "canon",
+        help=(
+            "print canonical 81-char form (D4 × bands/stacks × inner row/col swaps × digit relabel)"
+        ),
+    )
+    canon_parser.add_argument("--grid", help="81-char string; 0/./- for blanks")
+    canon_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
+    canon_parser.set_defaults(func=cmd_canon)
 
     args = parser.parse_args(argv)
     if not hasattr(args, "func"):

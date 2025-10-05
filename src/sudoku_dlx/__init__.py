@@ -10,6 +10,7 @@ from .api import (
     solve,
     to_string,
 )
+from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
 from .solver import (
@@ -35,6 +36,7 @@ __all__ = [
     "solve",
     "count_solutions",
     "rate",
+    "canonical_form",
     "generate",
     # Legacy exports
     "SOLVER",
