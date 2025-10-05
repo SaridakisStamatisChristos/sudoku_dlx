@@ -46,6 +46,9 @@ sudoku-dlx rate  --grid "<81chars>"
 sudoku-dlx canon --grid "<81chars>"  # D4 × bands/stacks × inner row/col × digit relabel
 # Produces a stable 81-char string for deduping datasets.
 
+# Dedupe a file of puzzles (fast)
+sudoku-dlx dedupe --in puzzles.txt --out unique.txt
+
 # Generate a unique puzzle (deterministic with seed)
 sudoku-dlx gen   --seed 123 --givens 30           # ~target clue count (approx)
 sudoku-dlx gen   --seed 123 --givens 30 --pretty
