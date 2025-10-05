@@ -130,3 +130,19 @@ To publish a new version on [PyPI](https://pypi.org/project/sudoku_dlx/):
 
 The CI workflow already runs tests against multiple Python versions and uploads coverage
 reports to Codecov; the `pages` workflow deploys the static demo from the `web/` directory.
+
+### Automated releases (no auto-PyPI)
+On pushing a tag like `v0.2.1`, GitHub Actions will:
+- run tests against 3.10–3.12,
+- build wheels/sdist, and
+- attach artifacts to the GitHub Release (no PyPI upload).
+
+### Manual publish (when you’re ready)
+1. Create a token on PyPI (or TestPyPI).
+2. Add a repo secret:
+   - **Settings → Secrets and variables → Actions**
+   - New secrets: `PYPI_API_TOKEN` (and/or `TEST_PYPI_API_TOKEN`)
+3. From **Actions** tab, run **publish**:
+   - Choose **pypi** or **testpypi**
+   - Optionally set **ref** (leave blank to use default branch HEAD)
+4. The workflow builds and uploads the current code to the chosen index.
