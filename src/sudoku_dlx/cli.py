@@ -9,7 +9,7 @@ import sys
 import time
 from typing import Optional
 
-from .api import analyze, from_string, is_valid, solve, to_string
+from .api import analyze, build_reveal_trace, from_string, is_valid, solve, to_string
 from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
@@ -60,6 +60,11 @@ def cmd_solve(ns: argparse.Namespace) -> int:
         _print_grid(result.grid)
     else:
         print(to_string(result.grid))
+    if ns.trace:
+        trace = build_reveal_trace(grid, result.grid, result.stats)
+        outp = pathlib.Path(ns.trace)
+        outp.parent.mkdir(parents=True, exist_ok=True)
+        outp.write_text(json.dumps(trace, indent=2, sort_keys=True), encoding="utf-8")
     if ns.stats:
         print(
             f"# solved in {result.stats.ms:.2f} ms · nodes {result.stats.nodes} · backtracks {result.stats.backtracks}",
@@ -279,6 +284,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     solve_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
     solve_parser.add_argument("--pretty", action="store_true", help="print 9x9 grid format")
     solve_parser.add_argument("--stats", action="store_true", help="print timing & node stats to stderr")
+    solve_parser.add_argument("--trace", help="write a solution-reveal trace JSON to this path")
     solve_parser.set_defaults(func=cmd_solve)
 
     rate_parser = sub.add_parser("rate", help="estimate difficulty in [0,10]")
