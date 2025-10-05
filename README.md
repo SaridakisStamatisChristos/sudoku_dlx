@@ -42,6 +42,10 @@ sudoku-dlx solve --grid "<81chars>" --pretty --stats
 # Rate difficulty (0..10)
 sudoku-dlx rate  --grid "<81chars>"
 
+# Canonicalize (dedupe isomorphic puzzles)
+sudoku-dlx canon --grid "<81chars>"  # D4 × bands/stacks × inner row/col × digit relabel
+# Produces a stable 81-char string for deduping datasets.
+
 # Generate a unique puzzle (deterministic with seed)
 sudoku-dlx gen   --seed 123 --givens 30           # ~target clue count (approx)
 sudoku-dlx gen   --seed 123 --givens 30 --pretty
