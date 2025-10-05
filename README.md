@@ -46,6 +46,11 @@ sudoku-dlx rate  --grid "<81chars>"
 sudoku-dlx canon --grid "<81chars>"  # D4 × bands/stacks × inner row/col × digit relabel
 # Produces a stable 81-char string for deduping datasets.
 
+# Batch tools
+sudoku-dlx gen-batch --out puzzles.txt --count 1000 --givens 30 --symmetry rot180 --minimal
+sudoku-dlx rate-file --in puzzles.txt --csv ratings.csv
+python bench/bench_file.py --in puzzles.txt
+
 # Dedupe a file of puzzles (fast)
 sudoku-dlx dedupe --in puzzles.txt --out unique.txt
 
