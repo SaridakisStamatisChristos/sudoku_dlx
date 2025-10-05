@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import argparse
+import csv
 import pathlib
+import random
 import sys
 from typing import Optional
 
@@ -70,6 +74,52 @@ def cmd_canon(ns: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_gen_batch(ns: argparse.Namespace) -> int:
+    """Generate many canonicalized, unique puzzles quickly."""
+
+    out_path = pathlib.Path(ns.out)
+    seen: set[str] = set()
+    rng = random.Random(ns.seed)
+    unique: list[str] = []
+    while len(unique) < ns.count:
+        grid = generate(
+            seed=rng.randrange(2**31 - 1),
+            target_givens=ns.givens,
+            minimal=ns.minimal,
+            symmetry=ns.symmetry,
+        )
+        canon = canonical_form(grid)
+        if canon in seen:
+            continue
+        seen.add(canon)
+        unique.append(canon)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", encoding="utf-8") as handle:
+        for value in unique:
+            handle.write(value + "\n")
+    print(f"# generated: {len(unique)}", file=sys.stderr)
+    return 0
+
+
+def cmd_rate_file(ns: argparse.Namespace) -> int:
+    inp = pathlib.Path(ns.in_path)
+    rows: list[tuple[str, float]] = []
+    with inp.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            s = "".join(ch for ch in line.strip() if not ch.isspace())
+            if not s:
+                continue
+            score = rate(from_string(s))
+            rows.append((s, score))
+            print(f"{score:.1f}")
+    if ns.csv_path:
+        with open(ns.csv_path, "w", newline="", encoding="utf-8") as csv_handle:
+            writer = csv.writer(csv_handle)
+            writer.writerow(["grid", "score"])
+            writer.writerows(rows)
+    return 0
+
+
 def cmd_dedupe(ns: argparse.Namespace) -> int:
     inp = pathlib.Path(ns.in_path)
     outp = pathlib.Path(ns.out_path)
@@ -126,19 +176,31 @@ def main(argv: Optional[list[str]] = None) -> int:
     canon_parser.set_defaults(func=cmd_canon)
 
     dedupe_parser = sub.add_parser(
-        "dedupe",
-        help="dedupe puzzles by canonical form (one 81-char grid per line)",
+        "dedupe", help="dedupe puzzles by canonical form (one 81-char grid per line)"
     )
+    dedupe_parser.add_argument("--in", dest="in_path", required=True, help="input text file")
     dedupe_parser.add_argument(
-        "--in", dest="in_path", required=True, help="input text file with one grid per line"
-    )
-    dedupe_parser.add_argument(
-        "--out",
-        dest="out_path",
-        required=True,
-        help="output file path for unique canonical grids",
+        "--out", dest="out_path", required=True, help="output file for unique canonical grids"
     )
     dedupe_parser.set_defaults(func=cmd_dedupe)
+
+    genb_parser = sub.add_parser("gen-batch", help="generate N unique puzzles to a file")
+    genb_parser.add_argument("--out", required=True, help="output file (81-char per line)")
+    genb_parser.add_argument("--count", type=int, default=100, help="number of puzzles")
+    genb_parser.add_argument("--givens", type=int, default=30)
+    genb_parser.add_argument(
+        "--symmetry", choices=["none", "rot180", "mix"], default="mix"
+    )
+    genb_parser.add_argument("--minimal", action="store_true")
+    genb_parser.add_argument("--seed", type=int, default=None)
+    genb_parser.set_defaults(func=cmd_gen_batch)
+
+    ratef_parser = sub.add_parser("rate-file", help="rate each puzzle in a file")
+    ratef_parser.add_argument("--in", dest="in_path", required=True)
+    ratef_parser.add_argument(
+        "--csv", dest="csv_path", help="optional CSV output path"
+    )
+    ratef_parser.set_defaults(func=cmd_rate_file)
 
     gen_parser = sub.add_parser("gen", help="generate a puzzle")
     gen_parser.add_argument("--seed", type=int, default=None)
