@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-import argparse
-import csv
-import json
-import pathlib
-import random
-import sys
-import time
+import argparse, sys, pathlib, csv, random, json, time, multiprocessing as mp
 from typing import Optional
 
 from .api import analyze, build_reveal_trace, from_string, is_valid, solve, to_string
@@ -14,6 +8,26 @@ from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
 from statistics import mean
+
+
+def _count_givens(grid) -> int:
+    return sum(1 for r in range(9) for c in range(9) if grid[r][c] != 0)
+
+
+def _gen_batch_worker(args: tuple[int, int, bool, str, int, int]) -> str:
+    seed_i, target_givens, minimal, symmetry, min_givens, max_givens = args
+    local_rng = random.Random(seed_i)
+    while True:
+        g = generate(
+            seed=local_rng.randrange(2**31 - 1),
+            target_givens=target_givens,
+            minimal=minimal,
+            symmetry=symmetry,
+        )
+        gv = _count_givens(g)
+        if min_givens <= gv <= max_givens:
+            return canonical_form(g)
+
 
 
 def _read_grid_arg(ns: argparse.Namespace) -> str:
@@ -110,31 +124,49 @@ def cmd_canon(ns: argparse.Namespace) -> int:
 
 
 def cmd_gen_batch(ns: argparse.Namespace) -> int:
-    """Generate many canonicalized, unique puzzles quickly."""
-
-    out_path = pathlib.Path(ns.out)
+    """
+    Generate many canonicalized, unique puzzles quickly.
+    """
+    outp = pathlib.Path(ns.out)
     seen: set[str] = set()
-    rng = random.Random(ns.seed)
-    unique: list[str] = []
-    while len(unique) < ns.count:
-        grid = generate(
-            seed=rng.randrange(2**31 - 1),
-            target_givens=ns.givens,
-            minimal=ns.minimal,
-            symmetry=ns.symmetry,
-        )
-        canon = canonical_form(grid)
-        if canon in seen:
-            continue
-        seen.add(canon)
-        unique.append(canon)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", encoding="utf-8") as handle:
-        for value in unique:
-            handle.write(value + "\n")
-    print(f"# generated: {len(unique)}", file=sys.stderr)
-    return 0
+    uniq: list[str] = []
 
+    base_seed = ns.seed if ns.seed is not None else random.randrange(2**31 - 1)
+    if ns.parallel <= 1:
+        i = 0
+        while len(uniq) < ns.count:
+            args = (base_seed + i, ns.givens, ns.minimal, ns.symmetry, ns.min_givens, ns.max_givens)
+            i += 1
+            c = _gen_batch_worker(args)
+            if c in seen:
+                continue
+            seen.add(c)
+            uniq.append(c)
+    else:
+        with mp.Pool(processes=ns.parallel) as pool:
+            i = 0
+            # produce candidates until we reach count
+            while len(uniq) < ns.count:
+                batch_n = max(4 * ns.parallel, ns.count - len(uniq))
+                seeds = [base_seed + j for j in range(i, i + batch_n)]
+                i += batch_n
+                args_iter = [
+                    (seed, ns.givens, ns.minimal, ns.symmetry, ns.min_givens, ns.max_givens)
+                    for seed in seeds
+                ]
+                for c in pool.imap_unordered(_gen_batch_worker, args_iter):
+                    if c in seen:
+                        continue
+                    seen.add(c)
+                    uniq.append(c)
+                    if len(uniq) >= ns.count:
+                        break
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    with outp.open("w", encoding="utf-8") as f:
+        for u in uniq:
+            f.write(u + "\n")
+    print(f"# generated: {len(uniq)}", file=sys.stderr)
+    return 0
 
 def cmd_rate_file(ns: argparse.Namespace) -> int:
     inp = pathlib.Path(ns.in_path)
@@ -146,7 +178,10 @@ def cmd_rate_file(ns: argparse.Namespace) -> int:
                 continue
             score = rate(from_string(s))
             rows.append((s, score))
-            print(f"{score:.1f}")
+            if ns.json:
+                print(json.dumps({"grid": s, "score": round(score, 1)}, separators=(",", ":")))
+            else:
+                print(f"{score:.1f}")
     if ns.csv_path:
         with open(ns.csv_path, "w", newline="", encoding="utf-8") as csv_handle:
             writer = csv.writer(csv_handle)
@@ -169,41 +204,57 @@ def _percentile(xs: list[float], p: float) -> float:
 
 def cmd_stats_file(ns: argparse.Namespace) -> int:
     inp = pathlib.Path(ns.in_path)
-    total = 0
+    processed = 0
     n_valid = n_solvable = n_unique = 0
     givens: list[int] = []
     diffs: list[float] = []
     ms_list: list[float] = []
     t0 = time.perf_counter()
+    # reservoir sample if requested
+    sample_k = ns.sample if ns.sample and ns.sample > 0 else 0
+    rng = random.Random(1337)
+    lines: list[str] = []
     with inp.open("r", encoding="utf-8") as handle:
         for line in handle:
             s = "".join(ch for ch in line.strip() if not ch.isspace())
             if not s:
                 continue
-            try:
-                grid = from_string(s)
-            except Exception:
-                continue
-            data = analyze(grid)
-            total += 1
-            if data["valid"]:
-                n_valid += 1
-            if data["solvable"]:
-                n_solvable += 1
-            if data["unique"]:
-                n_unique += 1
-            givens.append(int(data["givens"]))
-            diffs.append(float(data["difficulty"]))
-            ms_list.append(float(data["stats"]["ms"]))
-    if total == 0:
+            if ns.limit and processed >= ns.limit:
+                break
+            processed += 1
+            if sample_k == 0:
+                lines.append(s)
+            else:
+                if len(lines) < sample_k:
+                    lines.append(s)
+                else:
+                    j = rng.randrange(1, processed + 1)
+                    if j <= sample_k:
+                        lines[j - 1] = s
+    for s in lines:
+        try:
+            grid = from_string(s)
+        except Exception:
+            continue
+        data = analyze(grid)
+        if data["valid"]:
+            n_valid += 1
+        if data["solvable"]:
+            n_solvable += 1
+        if data["unique"]:
+            n_unique += 1
+        givens.append(int(data["givens"]))
+        diffs.append(float(data["difficulty"]))
+        ms_list.append(float(data["stats"]["ms"]))
+    if len(lines) == 0:
         print("no puzzles read", file=sys.stderr)
         return 2
     elapsed = (time.perf_counter() - t0) * 1000.0
     report = {
-        "count": total,
-        "valid_pct": round(100.0 * n_valid / total, 2),
-        "solvable_pct": round(100.0 * n_solvable / total, 2),
-        "unique_pct": round(100.0 * n_unique / total, 2),
+        "count": len(lines),
+        "valid_pct": round(100.0 * n_valid / len(lines), 2),
+        "solvable_pct": round(100.0 * n_solvable / len(lines), 2),
+        "unique_pct": round(100.0 * n_unique / len(lines), 2),
         "givens_mean": round(mean(givens), 2),
         "givens_min": min(givens),
         "givens_max": max(givens),
@@ -244,7 +295,6 @@ def cmd_stats_file(ns: argparse.Namespace) -> int:
                     ]
                 )
     return 0
-
 
 def cmd_dedupe(ns: argparse.Namespace) -> int:
     inp = pathlib.Path(ns.in_path)
@@ -328,6 +378,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     genb_parser.add_argument("--minimal", action="store_true")
     genb_parser.add_argument("--seed", type=int, default=None)
+    genb_parser.add_argument("--min-givens", type=int, default=0, help="keep only puzzles with >= this many givens")
+    genb_parser.add_argument("--max-givens", type=int, default=81, help="keep only puzzles with <= this many givens")
+    genb_parser.add_argument("--parallel", type=int, default=1, help="processes for generation (default 1)")
     genb_parser.set_defaults(func=cmd_gen_batch)
 
     ratef_parser = sub.add_parser("rate-file", help="rate each puzzle in a file")
@@ -335,6 +388,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     ratef_parser.add_argument(
         "--csv", dest="csv_path", help="optional CSV output path"
     )
+    ratef_parser.add_argument("--json", action="store_true", help="print one JSON object per line to stdout")
     ratef_parser.set_defaults(func=cmd_rate_file)
 
     stats_parser = sub.add_parser("stats-file", help="summarize a file of puzzles")
@@ -348,6 +402,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     stats_parser.add_argument(
         "--bins", type=int, default=11, help="histogram bins (default 11 for 0..10)"
     )
+    stats_parser.add_argument("--limit", type=int, default=0, help="process at most N lines (0 = no limit)")
+    stats_parser.add_argument("--sample", type=int, default=0, help="reservoir sample K lines (0 = no sampling)")
     stats_parser.set_defaults(func=cmd_stats_file)
 
     gen_parser = sub.add_parser("gen", help="generate a puzzle")

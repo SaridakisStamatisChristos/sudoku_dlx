@@ -56,6 +56,19 @@ sudoku-dlx gen-batch --out puzzles.txt --count 1000 --givens 30 --symmetry rot18
 sudoku-dlx rate-file --in puzzles.txt --csv ratings.csv
 python bench/bench_file.py --in puzzles.txt
 
+## Batch controls & parallel
+Generate with bounds and multiple processes:
+```bash
+sudoku-dlx gen-batch --out puzzles.txt --count 1000 --givens 30 \
+  --min-givens 28 --max-givens 40 --parallel 8
+```
+
+JSON output for ratings & sampling in stats:
+```bash
+sudoku-dlx rate-file  --in puzzles.txt --json > scores.ndjson
+sudoku-dlx stats-file --in puzzles.txt --limit 5000 --sample 1000 --json stats.json
+```
+
 # Dedupe a file of puzzles (fast)
 sudoku-dlx dedupe --in puzzles.txt --out unique.txt
 
