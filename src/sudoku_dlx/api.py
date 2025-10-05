@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import perf_counter
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 Grid = List[List[int]]
+
+ANALYZE_VERSION = "1"
 
 
 @dataclass
@@ -88,6 +90,50 @@ def count_solutions(grid: Grid, limit: int = 2) -> int:
     engine = DLXEngine()
     return engine.count(rows, limit=limit)
 
+
+def analyze(grid: Grid) -> Dict[str, Any]:
+    """
+    Return a compact analysis dict for a Sudoku grid. Keys:
+      - version: schema version string
+      - valid: bool (no row/col/box duplicates among givens)
+      - givens: int
+      - solvable: bool
+      - unique: bool (exactly one solution determined via limit=2)
+      - difficulty: float in [0,10] (heuristic)
+      - canonical: str (81-char canonical form)
+      - solution: str | None (81-char solution if solvable)
+      - stats: {ms, nodes, backtracks} (0s if unsolvable)
+    """
+    from .rating import rate
+    from .canonical import canonical_form
+
+    givens = sum(1 for r in range(9) for c in range(9) if grid[r][c] != 0)
+    valid = is_valid(grid)
+    uniq = False
+    solv: Optional[SolveResult] = None
+    if valid:
+        # Uniqueness and solvability
+        uniq = count_solutions(grid, limit=2) == 1
+        solv = solve(grid)
+    solution = None
+    ms = nodes = backs = 0
+    if solv is not None:
+        solution = to_string(solv.grid)
+        ms = int(round(solv.stats.ms))
+        nodes = int(solv.stats.nodes)
+        backs = int(solv.stats.backtracks)
+    return {
+        "version": ANALYZE_VERSION,
+        "valid": valid,
+        "givens": givens,
+        "solvable": solv is not None,
+        "unique": uniq,
+        "difficulty": float(rate(grid)),
+        "canonical": canonical_form(grid),
+        "solution": solution,
+        "stats": {"ms": ms, "nodes": nodes, "backtracks": backs},
+    }
+
 __all__ = [
     "Grid",
     "Stats",
@@ -97,4 +143,5 @@ __all__ = [
     "is_valid",
     "solve",
     "count_solutions",
+    "analyze",
 ]
