@@ -60,6 +60,15 @@ sudoku-dlx gen   --seed 123 --givens 30 --pretty
 # Analyze (valid/solvable/unique/difficulty/stats/canonical)
 sudoku-dlx check --grid "<81chars>"
 sudoku-dlx check --grid "<81chars>" --json > report.json
+
+# Dataset stats
+sudoku-dlx stats-file --in puzzles.txt --json stats.json --csv diff_hist.csv
+# prints a compact JSON summary to stdout and writes optional files:
+# {
+#   "count": 1000, "valid_pct": 100.0, "solvable_pct": 100.0, "unique_pct": 100.0,
+#   "givens_mean": 29.4, "difficulty_mean": 4.2, "difficulty_p90": 6.8, ...
+# }
+
 # Advanced generator flags:
 sudoku-dlx gen   --seed 123 --givens 28 --minimal
 sudoku-dlx gen   --seed 123 --givens 28 --symmetry rot180

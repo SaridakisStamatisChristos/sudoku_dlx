@@ -6,12 +6,14 @@ import json
 import pathlib
 import random
 import sys
+import time
 from typing import Optional
 
 from .api import analyze, from_string, is_valid, solve, to_string
 from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
+from statistics import mean
 
 
 def _read_grid_arg(ns: argparse.Namespace) -> str:
@@ -148,6 +150,97 @@ def cmd_rate_file(ns: argparse.Namespace) -> int:
     return 0
 
 
+def _percentile(xs: list[float], p: float) -> float:
+    if not xs:
+        return 0.0
+    xs = sorted(xs)
+    k = (len(xs) - 1) * p
+    f = int(k)
+    c = min(f + 1, len(xs) - 1)
+    if f == c:
+        return xs[f]
+    return xs[f] + (xs[c] - xs[f]) * (k - f)
+
+
+def cmd_stats_file(ns: argparse.Namespace) -> int:
+    inp = pathlib.Path(ns.in_path)
+    total = 0
+    n_valid = n_solvable = n_unique = 0
+    givens: list[int] = []
+    diffs: list[float] = []
+    ms_list: list[float] = []
+    t0 = time.perf_counter()
+    with inp.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            s = "".join(ch for ch in line.strip() if not ch.isspace())
+            if not s:
+                continue
+            try:
+                grid = from_string(s)
+            except Exception:
+                continue
+            data = analyze(grid)
+            total += 1
+            if data["valid"]:
+                n_valid += 1
+            if data["solvable"]:
+                n_solvable += 1
+            if data["unique"]:
+                n_unique += 1
+            givens.append(int(data["givens"]))
+            diffs.append(float(data["difficulty"]))
+            ms_list.append(float(data["stats"]["ms"]))
+    if total == 0:
+        print("no puzzles read", file=sys.stderr)
+        return 2
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    report = {
+        "count": total,
+        "valid_pct": round(100.0 * n_valid / total, 2),
+        "solvable_pct": round(100.0 * n_solvable / total, 2),
+        "unique_pct": round(100.0 * n_unique / total, 2),
+        "givens_mean": round(mean(givens), 2),
+        "givens_min": min(givens),
+        "givens_max": max(givens),
+        "difficulty_mean": round(mean(diffs), 3),
+        "difficulty_p50": round(_percentile(diffs, 0.50), 3),
+        "difficulty_p90": round(_percentile(diffs, 0.90), 3),
+        "difficulty_p99": round(_percentile(diffs, 0.99), 3),
+        "solve_ms_mean": round(mean(ms_list), 2),
+        "elapsed_ms": round(elapsed, 1),
+    }
+    print(json.dumps(report, separators=(",", ":"), sort_keys=True))
+    if ns.json_path:
+        pathlib.Path(ns.json_path).write_text(
+            json.dumps(report, indent=2, sort_keys=True), encoding="utf-8"
+        )
+    if ns.csv_path:
+        bins = max(1, ns.bins)
+        lo, hi = 0.0, 10.0
+        width = (hi - lo) / bins
+        counts = [0] * bins
+        for diff in diffs:
+            if diff < lo:
+                idx = 0
+            elif diff >= hi:
+                idx = bins - 1
+            else:
+                idx = int((diff - lo) // width)
+            counts[idx] += 1
+        with open(ns.csv_path, "w", newline="", encoding="utf-8") as csv_handle:
+            writer = csv.writer(csv_handle)
+            writer.writerow(["bin_lower", "bin_upper", "count"])
+            for i, count in enumerate(counts):
+                writer.writerow(
+                    [
+                        round(lo + i * width, 3),
+                        round(lo + (i + 1) * width, 3),
+                        count,
+                    ]
+                )
+    return 0
+
+
 def cmd_dedupe(ns: argparse.Namespace) -> int:
     inp = pathlib.Path(ns.in_path)
     outp = pathlib.Path(ns.out_path)
@@ -237,6 +330,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         "--csv", dest="csv_path", help="optional CSV output path"
     )
     ratef_parser.set_defaults(func=cmd_rate_file)
+
+    stats_parser = sub.add_parser("stats-file", help="summarize a file of puzzles")
+    stats_parser.add_argument(
+        "--in", dest="in_path", required=True, help="input text file (81-char per line)"
+    )
+    stats_parser.add_argument("--json", dest="json_path", help="write JSON report to file")
+    stats_parser.add_argument(
+        "--csv", dest="csv_path", help="write difficulty histogram CSV"
+    )
+    stats_parser.add_argument(
+        "--bins", type=int, default=11, help="histogram bins (default 11 for 0..10)"
+    )
+    stats_parser.set_defaults(func=cmd_stats_file)
 
     gen_parser = sub.add_parser("gen", help="generate a puzzle")
     gen_parser.add_argument("--seed", type=int, default=None)
