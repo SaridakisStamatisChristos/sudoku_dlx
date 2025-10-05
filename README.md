@@ -70,9 +70,18 @@ sudoku-dlx stats-file --in puzzles.txt --json stats.json --csv diff_hist.csv
 # }
 
 # Advanced generator flags:
+# Minimal & symmetry (slower; strict guarantee)
 sudoku-dlx gen   --seed 123 --givens 28 --minimal
-sudoku-dlx gen   --seed 123 --givens 28 --symmetry rot180
+sudoku-dlx gen   --seed 123 --givens 28 --minimal --symmetry rot180
 ```
+
+What this gives you
+
+Strict minimality: after generation, removing any single clue breaks uniqueness.
+
+Symmetry enforcement: rot180 removals are paired; mix keeps pairs adjacent but allows singles too.
+
+CI-safe tests: fast settings, strong assertions.
 
 ## Library (typed API)
 

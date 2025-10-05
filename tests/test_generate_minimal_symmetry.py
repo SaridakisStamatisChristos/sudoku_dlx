@@ -1,13 +1,12 @@
-from sudoku_dlx import generate, is_valid, solve
+from sudoku_dlx import generate, is_valid, solve, count_solutions
 
 
 def _filled(grid) -> int:
     return sum(1 for r in range(9) for c in range(9) if grid[r][c] != 0)
 
 
-def _is_minimal(grid) -> bool:
-    from sudoku_dlx import count_solutions
-
+def _is_minimal_strict(grid) -> bool:
+    # removing any single clue must break uniqueness
     for r in range(9):
         for c in range(9):
             if grid[r][c] == 0:
@@ -36,6 +35,11 @@ def test_gen_rot180_symmetry_unique_and_valid():
 def test_gen_minimal_flag_enforces_minimality():
     puzzle = generate(seed=11, target_givens=36, minimal=True, symmetry="none")
     assert is_valid(puzzle)
-    assert _is_minimal(puzzle)
+    assert _is_minimal_strict(puzzle)
     result = solve(puzzle)
     assert result is not None
+
+
+def test_minimal_puzzles_are_unique():
+    puzzle = generate(seed=21, target_givens=35, minimal=True, symmetry="mix")
+    assert count_solutions(puzzle, limit=2) == 1

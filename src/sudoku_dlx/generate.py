@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from typing import Optional
+from typing import Optional, Union
 
 from .api import Grid, count_solutions, is_valid, solve
 
@@ -45,19 +45,23 @@ def _rot180(r: int, c: int) -> tuple[int, int]:
     return 8 - r, 8 - c
 
 
-def _removal_schedule(
-    symmetry: Symmetry, rng: random.Random
-) -> list[tuple[int, int] | tuple[tuple[int, int], tuple[int, int]]]:
-    """Return a shuffled list of single cells or symmetric pairs to try removing."""
+PairOrCell = Union[tuple[int, int], tuple[tuple[int, int], tuple[int, int]]]
+
+
+def _removal_schedule(symmetry: Symmetry, rng: random.Random) -> list[PairOrCell]:
+    """
+    Return a shuffled list of single cells or symmetric pairs to try
+    removing, preserving adjacency for paired removals.
+    """
 
     cells = [(r, c) for r in range(9) for c in range(9)]
     rng.shuffle(cells)
     if symmetry == "none":
-        return cells  # type: ignore[return-value]
+        return cells  # singles only
 
     # rot180 or mix → group into pairs; center maps to itself
-    seen: set[tuple[int, int]] = set()
-    pairs: list[tuple[int, int] | tuple[tuple[int, int], tuple[int, int]]] = []
+    seen: set[tuple[int,int]] = set()
+    pairs: list[PairOrCell] = []
     for (r, c) in cells:
         if (r, c) in seen:
             continue
@@ -71,10 +75,10 @@ def _removal_schedule(
 
     rng.shuffle(pairs)
     if symmetry == "rot180":
-        return pairs  # type: ignore[return-value]
+        return pairs
 
     # mix → flatten but keep pairs adjacent; mix of singles/pairs
-    flat: list[tuple[int, int] | tuple[tuple[int, int], tuple[int, int]]] = []
+    flat: list[PairOrCell] = []
     for item in pairs:
         flat.append(item)
     return flat
@@ -100,21 +104,47 @@ def _try_remove(p: Grid, r: int, c: int) -> bool:
 def _make_minimal(p: Grid) -> Grid:
     """Enforce minimality: every clue is necessary for uniqueness."""
 
+    # Strict single-clue minimality:
+    # keep removing clues as long as uniqueness still holds.
+    # Order clues by a light heuristic: remove from denser rows/cols first.
+    def clue_list(grid: Grid) -> list[tuple[int, int]]:
+        clues: list[tuple[int,int]] = []
+        for r in range(9):
+            for c in range(9):
+                if grid[r][c] != 0:
+                    clues.append((r,c))
+        # heuristic: denser row/col first
+        row_count = [sum(1 for x in grid[r] if x != 0) for r in range(9)]
+        col_count = [sum(1 for r in range(9) if grid[r][c] != 0) for c in range(9)]
+        clues.sort(key=lambda rc: -(row_count[rc[0]] + col_count[rc[1]]))
+        return clues
+
     changed = True
     while changed:
         changed = False
-        for r in range(9):
-            for c in range(9):
-                if p[r][c] == 0:
-                    continue
-                keep = p[r][c]
+        for r, c in clue_list(p):
+            keep = p[r][c]
+            p[r][c] = 0
+            if _uniqueness(p):
+                # removal kept; continue loop to see if we can remove more
+                changed = True
+            else:
+                p[r][c] = keep
+    # Verify strict minimality: removing any single clue breaks uniqueness.
+    for r in range(9):
+        for c in range(9):
+            if p[r][c] == 0:
+                continue
+            keep = p[r][c]
+            p[r][c] = 0
+            still_unique = _uniqueness(p)
+            p[r][c] = keep
+            if still_unique:
+                # Extremely rare due to ordering/race; harden by removing it and re-running once.
                 p[r][c] = 0
-                if _uniqueness(p):
-                    changed = True
-                    # keep removed
-                else:
-                    p[r][c] = keep
-    return p
+                # Re-run a short pass to clean up any others unlocked by this removal.
+                return _make_minimal(p)
+    return p  # strict
 
 
 def generate(
@@ -144,11 +174,8 @@ def generate(
         if remaining_clues() <= target_givens:
             break
 
-        if (
-            isinstance(item, tuple)
-            and len(item) == 2
-            and isinstance(item[0], tuple)
-        ):
+        # If symmetry is rot180, paired removals must succeed together.
+        if isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], tuple):
             # symmetric pair (rot180)
             (r1, c1), (r2, c2) = item  # type: ignore[misc]
             keep1, keep2 = puzzle[r1][c1], puzzle[r2][c2]
