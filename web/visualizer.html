@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sudoku DLX — Solution Replay</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+    .grid { border-collapse: collapse; margin: 16px 0; }
+    .grid td { width: 32px; height: 32px; text-align: center; font-size: 18px; border: 1px solid #ccc; }
+    .grid td.bold-right { border-right: 2px solid #000; }
+    .grid td.bold-bottom { border-bottom: 2px solid #000; }
+    .stats { margin: 8px 0; color: #444; }
+    .controls button { margin-right: 8px; }
+    .filled { background: #eaf7ff; }
+    .given  { background: #f6f6f6; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Sudoku DLX — Solution Replay</h1>
+  <p>Load a <code>solution_reveal</code> JSON produced by <code>sudoku-dlx solve --trace out.json</code>.</p>
+  <input type="file" id="file" accept="application/json" />
+  <div class="stats" id="stats"></div>
+  <div class="controls">
+    <button id="btn-begin" disabled>&laquo; Begin</button>
+    <button id="btn-prev" disabled>&lsaquo; Step</button>
+    <button id="btn-play" disabled>Play</button>
+    <button id="btn-next" disabled>Step &rsaquo;</button>
+    <button id="btn-end" disabled>End &raquo;</button>
+  </div>
+  <table class="grid" id="grid"></table>
+
+  <script>
+    const gridEl = document.getElementById('grid');
+    const statsEl = document.getElementById('stats');
+    let trace = null, idx = 0, playing = null, initial = null, givenMask = null;
+
+    function buildGrid() {
+      gridEl.innerHTML = '';
+      for (let r = 0; r < 9; r++) {
+        const tr = document.createElement('tr');
+        for (let c = 0; c < 9; c++) {
+          const td = document.createElement('td');
+          td.id = `cell-${r}-${c}`;
+          if ((c+1) % 3 === 0 && c < 8) td.classList.add('bold-right');
+          if ((r+1) % 3 === 0 && r < 8) td.classList.add('bold-bottom');
+          tr.appendChild(td);
+        }
+        gridEl.appendChild(tr);
+      }
+    }
+    function setCell(r,c,val,klass) {
+      const td = document.getElementById(`cell-${r}-${c}`);
+      td.textContent = val || '';
+      td.classList.remove('filled', 'given');
+      if (klass) td.classList.add(klass);
+    }
+    function loadInitial(initial81) {
+      initial = initial81;
+      givenMask = [];
+      for (let i=0;i<81;i++) {
+        const r = Math.floor(i/9), c = i%9;
+        const ch = initial81[i];
+        const isGiven = ch !== '.';
+        givenMask.push(isGiven);
+        setCell(r,c,isGiven ? ch : '', isGiven ? 'given' : null);
+      }
+    }
+    function replayTo(k) {
+      // reset to initial
+      loadInitial(initial);
+      for (let i=0;i<k;i++) {
+        const {r,c,v} = trace.steps[i];
+        setCell(r,c,String(v),'filled');
+      }
+      idx = k;
+      updateButtons();
+    }
+    function updateButtons() {
+      const disabled = !trace;
+      document.getElementById('btn-begin').disabled = disabled || idx===0;
+      document.getElementById('btn-prev').disabled  = disabled || idx===0;
+      document.getElementById('btn-next').disabled  = disabled || idx>=trace.steps.length;
+      document.getElementById('btn-end').disabled   = disabled || idx>=trace.steps.length;
+      document.getElementById('btn-play').disabled  = disabled;
+      document.getElementById('btn-play').textContent = playing ? 'Pause' : 'Play';
+    }
+
+    document.getElementById('file').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (data.kind !== 'solution_reveal') { alert('Unexpected trace kind'); return; }
+      trace = data; idx = 0;
+      buildGrid();
+      loadInitial(trace.initial);
+      statsEl.textContent = `steps: ${trace.steps.length} · ${trace.stats.ms} ms · nodes ${trace.stats.nodes} · backtracks ${trace.stats.backtracks}`;
+      updateButtons();
+    });
+
+    document.getElementById('btn-begin').onclick = () => replayTo(0);
+    document.getElementById('btn-prev').onclick  = () => replayTo(Math.max(0, idx-1));
+    document.getElementById('btn-next').onclick  = () => replayTo(Math.min(trace.steps.length, idx+1));
+    document.getElementById('btn-end').onclick   = () => replayTo(trace.steps.length);
+    document.getElementById('btn-play').onclick  = () => {
+      if (!trace) return;
+      if (playing) { clearInterval(playing); playing = null; updateButtons(); return; }
+      playing = setInterval(() => {
+        if (idx >= trace.steps.length) { clearInterval(playing); playing = null; updateButtons(); return; }
+        replayTo(idx+1);
+      }, 60);
+      updateButtons();
+    };
+
+    buildGrid();
+  </script>
+</body>
+</html>

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import perf_counter
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Iterable, Tuple
 
 Grid = List[List[int]]
 
@@ -91,6 +91,33 @@ def count_solutions(grid: Grid, limit: int = 2) -> int:
     return engine.count(rows, limit=limit)
 
 
+def build_reveal_trace(initial: Grid, solved: Grid, stats: Stats) -> Dict[str, Any]:
+    """
+    Build a simple, deterministic 'solution_reveal' trace:
+      - initial: 81-char string (with '.')
+      - solution: 81-char string
+      - steps: list of {r,c,v} filling all blanks in row-major order
+      - stats: ms, nodes, backtracks
+    This is NOT a DLX cover/uncover trace, but is ideal for visual replay.
+    """
+    init_s = to_string(initial)
+    sol_s = to_string(solved)
+    steps: List[Dict[str, int]] = []
+    for i, ch in enumerate(init_s):
+        if ch == ".":
+            r, c = divmod(i, 9)
+            v = int(sol_s[i])
+            steps.append({"r": r, "c": c, "v": v})
+    return {
+        "version": "reveal-1",
+        "kind": "solution_reveal",
+        "initial": init_s,
+        "solution": sol_s,
+        "steps": steps,
+        "stats": {"ms": int(round(stats.ms)), "nodes": int(stats.nodes), "backtracks": int(stats.backtracks)},
+    }
+
+
 def analyze(grid: Grid) -> Dict[str, Any]:
     """
     Return a compact analysis dict for a Sudoku grid. Keys:
@@ -140,6 +167,7 @@ __all__ = [
     "SolveResult",
     "from_string",
     "to_string",
+    "build_reveal_trace",
     "is_valid",
     "solve",
     "count_solutions",

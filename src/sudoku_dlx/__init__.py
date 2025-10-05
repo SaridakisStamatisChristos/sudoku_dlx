@@ -10,6 +10,7 @@ from .api import (
     analyze,
     solve,
     to_string,
+    build_reveal_trace,
 )
 from .canonical import canonical_form
 from .generate import generate
@@ -33,6 +34,7 @@ __all__ = [
     "SolveResult",
     "from_string",
     "to_string",
+    "build_reveal_trace",
     "is_valid",
     "solve",
     "analyze",

@@ -73,6 +73,11 @@ sudoku-dlx stats-file --in puzzles.txt --json stats.json --csv diff_hist.csv
 # Minimal & symmetry (slower; strict guarantee)
 sudoku-dlx gen   --seed 123 --givens 28 --minimal
 sudoku-dlx gen   --seed 123 --givens 28 --minimal --symmetry rot180
+
+# Trace & Visualize
+sudoku-dlx solve --grid "<81chars>" --trace out.json
+# Then open web/visualizer.html in your browser and load out.json
+# (works on GitHub Pages)
 ```
 
 What this gives you
