@@ -49,7 +49,12 @@ def cmd_rate(ns: argparse.Namespace) -> int:
 
 
 def cmd_gen(ns: argparse.Namespace) -> int:
-    grid = generate(seed=ns.seed, target_givens=ns.givens)
+    grid = generate(
+        seed=ns.seed,
+        target_givens=ns.givens,
+        minimal=ns.minimal,
+        symmetry=ns.symmetry,
+    )
     if ns.pretty:
         _print_grid(grid)
     else:
@@ -79,6 +84,17 @@ def main(argv: Optional[list[str]] = None) -> int:
     gen_parser = sub.add_parser("gen", help="generate a puzzle")
     gen_parser.add_argument("--seed", type=int, default=None)
     gen_parser.add_argument("--givens", type=int, default=28, help="target number of clues (approx)")
+    gen_parser.add_argument(
+        "--minimal",
+        action="store_true",
+        help="enforce minimality (slower)",
+    )
+    gen_parser.add_argument(
+        "--symmetry",
+        choices=["none", "rot180", "mix"],
+        default="mix",
+        help="apply symmetry during clue removal",
+    )
     gen_parser.add_argument("--pretty", action="store_true")
     gen_parser.set_defaults(func=cmd_gen)
 
