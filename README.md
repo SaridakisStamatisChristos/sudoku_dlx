@@ -32,49 +32,60 @@ pytest -q
 ## CLI
 
 ```bash
-python -m sudoku_dlx --help
-python -m sudoku_dlx generate --target 17 --symmetry none --seed 1337
-python -m sudoku_dlx solve --grid "..3.2.6..9..3.5..1..18.64..81.29..7....8....67..82.5......."
-# Batch:
-python -m sudoku_dlx solve-file puzzles.txt      # one 81-char grid per line
-python -m sudoku_dlx solve-dir datasets/         # solve *.txt in dir
+sudoku-dlx --help
+
+# Solve (single grid as 81 chars; '.' or '0' for blanks)
+sudoku-dlx solve --grid "..3.2.6..9..3.5..1..18.64..81.29..7....8....67..82.5......."
+sudoku-dlx solve --file puzzles.txt               # a file with 9 lines of 9 chars
+sudoku-dlx solve --grid "<81chars>" --pretty --stats
+
+# Rate difficulty (0..10)
+sudoku-dlx rate  --grid "<81chars>"
+
+# Generate a unique puzzle (deterministic with seed)
+sudoku-dlx gen   --seed 123 --givens 30           # ~target clue count (approx)
+sudoku-dlx gen   --seed 123 --givens 30 --pretty
 ```
 
-## Library
+## Library (typed API)
 
 ```python
-from sudoku_dlx.solver import (
-    SOLVER, generate_minimal, print_grid, is_minimal,
-    grid_clues, from_string, to_string, validate_grid
-)
+from sudoku_dlx import from_string, to_string, is_valid, solve, generate, rate
 
-puz, sol = generate_minimal(target_clues=17, symmetry="mix", max_rounds=8000)
-print_grid(puz)
-cnt, solved = SOLVER.count_solutions(grid_clues(puz), limit=2)
+# Parse and validate
+g = from_string("53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79")
+assert is_valid(g)
+
+# Solve with stats
+res = solve(g)
+if res is not None:
+    print("Solved (ms, nodes, backtracks):", res.stats.ms, res.stats.nodes, res.stats.backtracks)
+    print("Solution (81 chars):", to_string(res.grid))
+
+# Generate a unique puzzle near a target clue count
+p = generate(seed=42, target_givens=30)
+
+# Difficulty score in [0,10]
+print("difficulty:", rate(p))
 ```
 
-### Stats & prepass
+### Stats
 
-The solver runs a cheap **naked-singles** prepass by default. After a call:
+`solve()` returns `SolveResult(stats=Stats(ms, nodes, backtracks))`. These are also used by the rater.
 
-```python
-cnt, sol = SOLVER.count_solutions(grid_clues(grid), limit=2)  # prepass=True by default
-print(SOLVER.stats)  # nodes, branches, max_depth, solutions
-```
-
-Disable with `prepass=False` to benchmark raw DLX.
-
-### Hardness estimate
+### Difficulty rating
 
 ```python
-from sudoku_dlx.solver import hardness_estimate, from_string
-g = from_string("53..7....6..195....")
-print(hardness_estimate(g))  # e.g., 3.8
+from sudoku_dlx import rate, from_string
+g = from_string("53..7....6..195...." + "."*63)
+print(rate(g))  # e.g., 3.8
 ```
 
 ## Roadmap
 
+* Minimality guarantee and symmetry knobs for the generator
 * Isomorph class canonicalization (reject equivalent puzzles)
+* Optional DLX step recorder + visualizer
 * MUS/MCS-style minimality certificates
 
 ## License
