@@ -77,17 +77,20 @@ class BitDLX:
         for c in cols: cols_mask = clear_bit(cols_mask, c)
         return rows_mask2, cols_mask
 
-    def _search(self, rows_mask:int, cols_mask:int, limit:int, keep_one:bool, collect_sol:list, found:list):
+    def _search(self, rows_mask:int, cols_mask:int, limit:int, keep_one:bool, collect_sol:list, found:list, stack:list):
         if cols_mask==0:
-            found[0]+=1; return found[0]>=limit
+            found[0]+=1
+            if keep_one and not collect_sol:
+                collect_sol.extend(stack)
+            return found[0]>=limit
         c = self._choose_col(rows_mask, cols_mask)
         cand = COL_ROWS_BITS[c] & rows_mask
         if cand==0: return False
         for r in iter_set_bits(cand):
             rows2, cols2 = self._cover_row(rows_mask, cols_mask, r)
-            if keep_one: collect_sol.append(r)
-            if self._search(rows2, cols2, limit, keep_one, collect_sol, found): return True
-            if keep_one: collect_sol.pop()
+            stack.append(r)
+            if self._search(rows2, cols2, limit, keep_one, collect_sol, found, stack): return True
+            stack.pop()
         return False
 
     def count_solutions(self, clues:list[tuple[int,int,int]], limit:int=2):
@@ -97,7 +100,7 @@ class BitDLX:
             if row_idx is None or not is_bit_set(rows_mask, row_idx): return 0, None
             rows_mask, cols_mask = self._cover_row(rows_mask, cols_mask, row_idx)
         found=[0]; collect=[]
-        self._search(rows_mask, cols_mask, limit, True, collect, found)
+        self._search(rows_mask, cols_mask, limit, True, collect, found, [])
         if found[0]==0: return 0, None
         grid=[[0]*9 for _ in range(9)]
         for (rr,cc,vv) in clues: grid[rr][cc]=vv
