@@ -90,10 +90,23 @@
     };
     clearBtn.onclick = ()=>{ writeGrid(Array(81).fill(0)); if (!solveBtn.disabled) { log('Cleared.'); } };
     sampleBtn.onclick = ()=>{
-      const s=("53..7...."+"6..195..."+".98....6."+"8...6...3"+"4..8.3..1"+"7...2...6"+".6....28."+"...419..5"+"....8..79");
-      const arr=[...s].map(ch=> ch==='.'?0:parseInt(ch,10));
+      // Normalize multiline samples to exactly 81 characters (digits or '.')
+      let sample = `
+        53..7....
+        6..195...
+        .98....6.
+        8...6...3
+        4..8.3..1
+        7...2...6
+        .6....28.
+        ...419..5
+        ....8..79
+      `;
+      sample = sample.replace(/\s+/g, '');
+      const normalized = (sample + '.'.repeat(81)).slice(0, 81);
+      const arr=[...normalized].map(ch=> ch==='.'?0:parseInt(ch,10));
       writeGrid(arr);
-      if (!solveBtn.disabled) { log('Loaded sample.'); }
+      if (!solveBtn.disabled) { log('Loaded sample. Click Solve.'); }
     };
   </script>
 </body>
