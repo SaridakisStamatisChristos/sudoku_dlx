@@ -45,6 +45,9 @@ sudoku-dlx rate  --grid "<81chars>"
 # Generate a unique puzzle (deterministic with seed)
 sudoku-dlx gen   --seed 123 --givens 30           # ~target clue count (approx)
 sudoku-dlx gen   --seed 123 --givens 30 --pretty
+# Advanced generator flags:
+sudoku-dlx gen   --seed 123 --givens 28 --minimal
+sudoku-dlx gen   --seed 123 --givens 28 --symmetry rot180
 ```
 
 ## Library (typed API)
