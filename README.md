@@ -29,6 +29,11 @@ pre-commit install
 pytest -q
 ```
 
+### Difficulty (v2)
+Deterministic score in [0,10] combining:
+- empties (gaps), DLX nodes, backtracks, and fill pressure.
+Invariant under isomorphisms; avoids timing for stability.
+
 ## CLI
 
 ```bash
@@ -63,7 +68,7 @@ sudoku-dlx check --grid "<81chars>" --json > report.json
 
 # Dataset stats
 sudoku-dlx stats-file --in puzzles.txt --json stats.json --csv diff_hist.csv
-# prints a compact JSON summary to stdout and writes optional files:
+# prints a compact JSON summary to stdout and writes optional files using v2 difficulty:
 # {
 #   "count": 1000, "valid_pct": 100.0, "solvable_pct": 100.0, "unique_pct": 100.0,
 #   "givens_mean": 29.4, "difficulty_mean": 4.2, "difficulty_p90": 6.8, ...
