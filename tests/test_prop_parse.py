@@ -1,3 +1,4 @@
+import pytest
 from hypothesis import given, settings, strategies as st
 from sudoku_dlx import from_string, to_string
 
@@ -5,6 +6,7 @@ from sudoku_dlx import from_string, to_string
 chars = st.sampled_from(list(".0123456789"))
 
 
+@pytest.mark.prop
 @settings(max_examples=30, deadline=None)
 @given(st.lists(chars, min_size=81, max_size=81))
 def test_from_to_string_round_trip_preserves_clues(xs):
@@ -24,6 +26,7 @@ def test_from_to_string_round_trip_preserves_clues(xs):
 ws = st.text(alphabet=st.sampled_from(list(" \t\r\n")), min_size=0, max_size=20)
 
 
+@pytest.mark.prop
 @settings(max_examples=20, deadline=None)
 @given(st.lists(chars, min_size=81, max_size=81), ws, ws)
 def test_parser_ignores_whitespace(xs, pre, post):
