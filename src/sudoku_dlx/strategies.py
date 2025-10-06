@@ -537,17 +537,22 @@ def apply_simple_coloring(grid: Grid, cand: Cand) -> Optional[Dict]:
             add_links(_unit_cells_box(b))
 
         color: List[Optional[int]] = [None] * len(nodes)
+        component: List[Optional[int]] = [None] * len(nodes)
+        comp_id = 0
         for start in range(len(nodes)):
             if color[start] is not None:
                 continue
             color[start] = 0
+            component[start] = comp_id
             stack = [start]
             while stack:
                 u = stack.pop()
                 for v in adj[u]:
                     if color[v] is None:
                         color[v] = 1 - color[u]
+                        component[v] = comp_id
                         stack.append(v)
+            comp_id += 1
 
         for unit_kind in ("row", "col", "box"):
             for unit_idx in range(9):
@@ -558,13 +563,15 @@ def apply_simple_coloring(grid: Grid, cand: Cand) -> Optional[Dict]:
                 ]
                 if len(cells) < 2:
                     continue
-                by_color: Dict[int, List[Tuple[int, int]]] = {}
+                by_color: Dict[Tuple[int, int], List[Tuple[int, int]]] = {}
                 for (r, c) in cells:
-                    col = color[idx[(r, c)]]
-                    if col is None:
+                    node_idx = idx[(r, c)]
+                    col = color[node_idx]
+                    comp = component[node_idx]
+                    if col is None or comp is None:
                         continue
-                    by_color.setdefault(col, []).append((r, c))
-                for col_value, positions in sorted(by_color.items()):
+                    by_color.setdefault((comp, col), []).append((r, c))
+                for (comp, col_value), positions in sorted(by_color.items()):
                     if len(positions) >= 2:
                         r, c = positions[0]
                         if d in cand[r][c]:
@@ -575,6 +582,7 @@ def apply_simple_coloring(grid: Grid, cand: Cand) -> Optional[Dict]:
                                 "digit": d,
                                 "unit": unit_kind,
                                 "unit_index": unit_idx,
+                                "component": comp,
                                 "color": col_value,
                                 "r": r,
                                 "c": c,

@@ -24,14 +24,17 @@ def test_simple_coloring_one_elimination() -> None:
     grid = [[0] * 9 for _ in range(9)]
     cand = candidates(grid)
     digit = 9
-    for r in range(2):
+    # Limit digit to four cells in box 0 forming a 2x2 square. Rows and columns
+    # now contain conjugate links for the digit, so simple coloring Rule 2
+    # should identify a conflict inside the box and eliminate one candidate.
+    for r in range(9):
         for c in range(9):
             cand[r][c].discard(digit)
-        cand[r][0].add(digit)
-        cand[r][3].add(digit)
-    cand[2][0].add(digit)
+    for r, c in [(0, 0), (0, 1), (1, 0), (1, 1)]:
+        cand[r][c].add(digit)
 
     move = apply_simple_coloring(grid, cand)
     assert move is not None
     assert move["strategy"] == "simple_coloring"
+    assert move["digit"] == digit
     assert digit not in cand[move["r"]][move["c"]]
