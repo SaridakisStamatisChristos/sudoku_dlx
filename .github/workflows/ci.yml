@@ -26,6 +26,10 @@ jobs:
         env:
           HYPOTHESIS_PROFILE: ci
         run: pytest -q --maxfail=1 --disable-warnings --cov=sudoku_dlx --cov-report=xml -m "not prop"
+      - name: Build docs (no deploy)
+        run: |
+          python -m pip install -U mkdocs mkdocs-material
+          mkdocs build --strict
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
