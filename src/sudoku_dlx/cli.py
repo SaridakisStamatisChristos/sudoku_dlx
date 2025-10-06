@@ -4,6 +4,7 @@ import argparse, sys, pathlib, csv, random, json, time, multiprocessing as mp
 from typing import Optional
 
 from .api import analyze, build_reveal_trace, from_string, is_valid, solve, to_string
+from .explain import explain
 from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
@@ -100,6 +101,19 @@ def cmd_check(ns: argparse.Namespace) -> int:
         print(json.dumps(data, separators=(",", ":"), sort_keys=True))
     else:
         _print_analysis(data)
+    return 0
+
+
+def cmd_explain(ns: argparse.Namespace) -> int:
+    grid = from_string(_read_grid_arg(ns))
+    data = explain(grid, max_steps=ns.max_steps)
+    if ns.json:
+        print(json.dumps(data, separators=(",", ":"), sort_keys=True))
+    else:
+        print("== sudoku-dlx explain ==")
+        for i, step in enumerate(data["steps"], 1):
+            print(f"{i:03d}. {step['strategy']}: {step}")
+        print(f"solved: {data['solved']}  steps: {len(data['steps'])}")
     return 0
 
 
@@ -349,6 +363,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     check_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
     check_parser.add_argument("--json", action="store_true", help="output JSON")
     check_parser.set_defaults(func=cmd_check)
+
+    explain_parser = sub.add_parser(
+        "explain", help="human-style steps (naked/hidden single, locked candidates)"
+    )
+    explain_parser.add_argument("--grid", help="81-char string; 0/./- for blanks")
+    explain_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
+    explain_parser.add_argument("--json", action="store_true")
+    explain_parser.add_argument("--max-steps", type=int, default=200)
+    explain_parser.set_defaults(func=cmd_explain)
 
     canon_parser = sub.add_parser(
         "canon",

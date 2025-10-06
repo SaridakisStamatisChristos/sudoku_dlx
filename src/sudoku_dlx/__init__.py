@@ -12,6 +12,7 @@ from .api import (
     to_string,
     build_reveal_trace,
 )
+from .explain import explain
 from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
@@ -39,6 +40,7 @@ __all__ = [
     "solve",
     "analyze",
     "count_solutions",
+    "explain",
     "rate",
     "canonical_form",
     "generate",

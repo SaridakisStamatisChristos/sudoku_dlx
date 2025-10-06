@@ -79,6 +79,11 @@ sudoku-dlx gen   --seed 123 --givens 30 --pretty
 sudoku-dlx check --grid "<81chars>"
 sudoku-dlx check --grid "<81chars>" --json > report.json
 
+# Explain (human-style)
+sudoku-dlx explain --grid "<81chars>" --json
+# Strategies: naked single, hidden single (row/col/box), locked candidates (pointing).
+# Deterministic steps for reproducible tutorials.
+
 # Dataset stats
 sudoku-dlx stats-file --in puzzles.txt --json stats.json --csv diff_hist.csv
 # prints a compact JSON summary to stdout and writes optional files using v2 difficulty:
