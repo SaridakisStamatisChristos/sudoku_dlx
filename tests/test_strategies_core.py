@@ -22,6 +22,11 @@ def _clear_digit(cand: list[list[set[int]]], digit: int) -> None:
             cell.discard(digit)
 
 
+def _set_candidates(cand: list[list[set[int]]], r: int, c: int, values: set[int]) -> None:
+    cand[r][c].clear()
+    cand[r][c].update(values)
+
+
 def test_locked_candidates_pointing_row() -> None:
     grid = _empty_grid()
     cand = candidates(grid)
@@ -97,16 +102,18 @@ def test_naked_pair_eliminates_other_candidates() -> None:
     _clear_digit(cand, 1)
     _clear_digit(cand, 2)
     _clear_digit(cand, 3)
-    cand[0][0].update({1, 2})
-    cand[0][1].update({1, 2})
-    cand[0][2].update({1, 2, 3})
+    _set_candidates(cand, 0, 0, {1, 2})
+    _set_candidates(cand, 0, 1, {1, 2})
+    _set_candidates(cand, 0, 2, {1, 2, 3})
 
     move = apply_naked_pair(grid, cand)
 
     assert move is not None
     assert move["strategy"] == "naked_pair"
     assert move["r"] == 0 and move["c"] == 2
-    assert 1 not in cand[0][2] and 2 not in cand[0][2]
+    assert move["pair"] == [1, 2]
+    assert move["remove"] in (1, 2)
+    assert move["remove"] not in cand[0][2]
 
 
 def test_hidden_pair_prunes_extras() -> None:
@@ -116,8 +123,8 @@ def test_hidden_pair_prunes_extras() -> None:
     _clear_digit(cand, digit_a)
     _clear_digit(cand, digit_b)
     _clear_digit(cand, extra)
-    cand[1][0].update({digit_a, digit_b, extra})
-    cand[1][1].update({digit_a, digit_b, extra})
+    _set_candidates(cand, 1, 0, {digit_a, digit_b, extra})
+    _set_candidates(cand, 1, 1, {digit_a, digit_b, extra})
 
     move = apply_hidden_pair(grid, cand)
 
@@ -135,10 +142,10 @@ def test_naked_triple_clears_unit() -> None:
     digits = (1, 2, 3, 4)
     for d in digits:
         _clear_digit(cand, d)
-    cand[2][0].update({1, 2})
-    cand[2][1].update({1, 3})
-    cand[2][2].update({2, 3})
-    cand[2][3].update({1, 4})
+    _set_candidates(cand, 2, 0, {1, 2})
+    _set_candidates(cand, 2, 1, {1, 3})
+    _set_candidates(cand, 2, 2, {2, 3})
+    _set_candidates(cand, 2, 3, {1, 4})
 
     move = apply_naked_triple(grid, cand)
 
@@ -155,9 +162,9 @@ def test_hidden_triple_culls_extras() -> None:
     extra = 7
     for d in (*triple, extra):
         _clear_digit(cand, d)
-    cand[3][0].update({4, 5, extra})
-    cand[3][1].update({4, 6})
-    cand[3][2].update({5, 6})
+    _set_candidates(cand, 3, 0, {4, 5, extra})
+    _set_candidates(cand, 3, 1, {4, 6})
+    _set_candidates(cand, 3, 2, {5, 6})
 
     move = apply_hidden_triple(grid, cand)
 
