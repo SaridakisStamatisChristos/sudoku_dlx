@@ -78,16 +78,17 @@ def test_box_line_claiming_col() -> None:
     cand = candidates(grid)
     digit = 4
     _clear_digit(cand, digit)
-    for r in range(3):
-        cand[r][0].add(digit)
-    cand[1][1].add(digit)
+    cand[0][0].add(digit)
+    cand[1][0].add(digit)
+    cand[2][1].add(digit)
 
     move = apply_box_line_claiming(grid, cand)
 
     assert move is not None
     assert move["strategy"] == "box_line_col"
     assert move["box"] == 0
-    assert digit not in cand[1][1]
+    assert move["r"] == 2 and move["c"] == 1
+    assert digit not in cand[2][1]
 
 
 def test_naked_pair_eliminates_other_candidates() -> None:
