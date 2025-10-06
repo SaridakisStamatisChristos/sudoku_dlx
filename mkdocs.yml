@@ -1,0 +1,48 @@
+site_name: Sudoku DLX
+site_description: Fast Sudoku DLX (Algorithm X) with generator, analysis, and explainable steps.
+site_url: https://SaridakisStamatisChristos.github.io/sudoku_dlx/docs/
+repo_url: https://github.com/SaridakisStamatisChristos/sudoku_dlx
+repo_name: SaridakisStamatisChristos/sudoku_dlx
+copyright: "© 2025 Stamatis-Christos Saridakis. MIT."
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+  icon:
+    repo: fontawesome/brands/github
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/SaridakisStamatisChristos
+  generator: false
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - CLI Guide: cli.md
+  - Python API: api.md
+  - Strategies: strategies.md
+  - Batch & Datasets: batch.md
+  - Changelog: changelog.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - toc:
+      permalink: true
+  - tables
+  - codehilite
+
+plugins:
+  - search
