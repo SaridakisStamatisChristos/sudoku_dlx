@@ -81,7 +81,12 @@ sudoku-dlx check --grid "<81chars>" --json > report.json
 
 # Explain (human-style)
 sudoku-dlx explain --grid "<81chars>" --json
-# Strategies: naked single, hidden single (row/col/box), locked candidates (pointing).
+# Strategies include:
+#   - singles: naked single, hidden single (row/col/box)
+#   - locked candidates: pointing (box→line), claiming (line→box)
+#   - pairs: naked pair, hidden pair (row/col/box)
+#   - triples: naked triple, hidden triple (row/col/box)
+#   - fish: X-Wing (rows & columns)
 # Deterministic steps for reproducible tutorials.
 
 # Dataset stats
