@@ -16,6 +16,7 @@ from .explain import explain
 from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
+from .crosscheck import sat_solve
 from .solver import (
     SOLVER,
     generate_minimal,
@@ -44,6 +45,7 @@ __all__ = [
     "rate",
     "canonical_form",
     "generate",
+    "sat_solve",
     # Legacy exports
     "SOLVER",
     "generate_minimal",
