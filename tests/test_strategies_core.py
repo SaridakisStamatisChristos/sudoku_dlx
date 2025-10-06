@@ -132,8 +132,18 @@ def test_hidden_pair_prunes_extras() -> None:
     assert move["strategy"] == "hidden_pair"
     assert move["r"] in (1,)
     assert move["c"] in (0, 1)
-    assert extra not in cand[1][0]
-    assert extra not in cand[1][1]
+    assert move["remove"] == extra
+    first_target = (move["r"], move["c"])
+    assert cand[first_target[0]][first_target[1]] == {digit_a, digit_b}
+
+    move_second = apply_hidden_pair(grid, cand)
+
+    assert move_second is not None
+    assert move_second["strategy"] == "hidden_pair"
+    assert (move_second["r"], move_second["c"]) != first_target
+    assert move_second["remove"] == extra
+    second_target = (move_second["r"], move_second["c"])
+    assert cand[second_target[0]][second_target[1]] == {digit_a, digit_b}
 
 
 def test_naked_triple_clears_unit() -> None:
