@@ -4,6 +4,7 @@ import argparse, sys, pathlib, csv, random, json, time, multiprocessing as mp
 from typing import Optional
 
 from .api import analyze, build_reveal_trace, from_string, is_valid, solve, to_string
+from .crosscheck import sat_solve
 from .explain import explain
 from .canonical import canonical_form
 from .generate import generate
@@ -64,6 +65,7 @@ def _print_analysis(data: dict) -> None:
 
 def cmd_solve(ns: argparse.Namespace) -> int:
     grid = from_string(_read_grid_arg(ns))
+    grid_for_crosscheck = [row[:] for row in grid]
     if not is_valid(grid):
         print("Invalid puzzle (duplicate in row/col/box).", file=sys.stderr)
         return 2
@@ -80,6 +82,22 @@ def cmd_solve(ns: argparse.Namespace) -> int:
         outp = pathlib.Path(ns.trace)
         outp.parent.mkdir(parents=True, exist_ok=True)
         outp.write_text(json.dumps(trace, indent=2, sort_keys=True), encoding="utf-8")
+    if ns.crosscheck:
+        if ns.crosscheck == "sat":
+            sat_grid = sat_solve(grid_for_crosscheck)
+            if sat_grid is None:
+                print(
+                    "# crosscheck: SAT solver unavailable (install optional extra: pip install -e '.[sat]')",
+                    file=sys.stderr,
+                )
+            else:
+                ok = to_string(sat_grid) == to_string(result.grid)
+                status = "OK" if ok else "MISMATCH"
+                print(f"# crosscheck[sat]: {status}", file=sys.stderr)
+                if not ok:
+                    print(f"# SAT solution: {to_string(sat_grid)}", file=sys.stderr)
+        else:
+            print(f"# crosscheck: unknown method {ns.crosscheck!r}", file=sys.stderr)
     if ns.stats:
         print(
             f"# solved in {result.stats.ms:.2f} ms · nodes {result.stats.nodes} · backtracks {result.stats.backtracks}",
@@ -349,6 +367,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     solve_parser.add_argument("--pretty", action="store_true", help="print 9x9 grid format")
     solve_parser.add_argument("--stats", action="store_true", help="print timing & node stats to stderr")
     solve_parser.add_argument("--trace", help="write a solution-reveal trace JSON to this path")
+    solve_parser.add_argument("--crosscheck", choices=["sat"], help="verify solution with external solver")
     solve_parser.set_defaults(func=cmd_solve)
 
     rate_parser = sub.add_parser("rate", help="estimate difficulty in [0,10]")

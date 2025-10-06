@@ -87,6 +87,7 @@ sudoku-dlx explain --grid "<81chars>" --json
 #   - pairs: naked pair, hidden pair (row/col/box)
 #   - triples: naked triple, hidden triple (row/col/box)
 #   - fish: X-Wing (rows & columns)
+#   - advanced: Swordfish (rows & columns), Simple Coloring (Rule 2)
 # Deterministic steps for reproducible tutorials.
 
 # Dataset stats
@@ -104,8 +105,20 @@ sudoku-dlx gen   --seed 123 --givens 28 --minimal --symmetry rot180
 
 # Trace & Visualize
 sudoku-dlx solve --grid "<81chars>" --trace out.json
-# Then open web/visualizer.html in your browser and load out.json
-# (works on GitHub Pages)
+# Open web/visualizer.html and load out.json
+```
+
+## Cross-check with SAT (optional)
+Install the optional extra:
+
+```bash
+pip install -e ".[sat]"
+```
+
+Then verify solutions using an independent SAT solver:
+
+```bash
+sudoku-dlx solve --grid "<81chars>" --crosscheck sat
 ```
 
 What this gives you
