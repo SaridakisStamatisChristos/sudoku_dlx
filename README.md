@@ -181,6 +181,11 @@ On pushing a tag like `v0.2.1`, GitHub Actions will:
 - build wheels/sdist, and
 - attach artifacts to the GitHub Release (no PyPI upload).
 
+**Release gates**:
+- `twine check` validates the built metadata.
+- tag `vX.Y.Z` must equal `sudoku_dlx.__version__` (build fails if not).
+- installs the wheel and imports the package before attaching.
+
 ### Manual publish (when you’re ready)
 1. Create a token on PyPI (or TestPyPI).
 2. Add a repo secret:
