@@ -157,12 +157,22 @@ def test_naked_triple_clears_unit() -> None:
     _set_candidates(cand, 2, 2, {2, 3})
     _set_candidates(cand, 2, 3, {1, 4})
 
+    before = {pos: cand[pos[0]][pos[1]].copy() for pos in ((2, 0), (2, 1), (2, 2), (2, 3))}
+
     move = apply_naked_triple(grid, cand)
 
     assert move is not None
     assert move["strategy"] == "naked_triple"
-    assert move["r"] == 2 and move["c"] == 3
-    assert 1 not in cand[2][3] and 2 not in cand[2][3] and 3 not in cand[2][3]
+    assert move["unit"] == "row"
+    assert move["unit_index"] == 2
+    target = (move["r"], move["c"])
+    removed = move["v"]
+
+    assert target[0] == 2
+    assert target in before
+    assert removed in {1, 2, 3}
+    assert removed in before[target]
+    assert cand[target[0]][target[1]] == before[target] - {removed}
 
 
 def test_hidden_triple_culls_extras() -> None:
