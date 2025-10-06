@@ -27,7 +27,7 @@ jobs:
           HYPOTHESIS_PROFILE: ci
         run: pytest -q --maxfail=1 --disable-warnings --cov=sudoku_dlx --cov-report=xml -m "not prop"
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}  # Not required for public repos
           files: ./coverage.xml
