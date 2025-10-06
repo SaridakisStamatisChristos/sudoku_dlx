@@ -1,3 +1,5 @@
+import pytest
+
 from sudoku_dlx import generate, count_solutions
 
 
@@ -15,6 +17,7 @@ def _is_minimal_strict(g) -> bool:
     return True
 
 
+@pytest.mark.prop
 def test_generate_minimal_unique_fast_settings():
     # modest givens to keep runtime under control in CI
     for seed in [5, 9]:

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from _pytest.config import Config
 from _pytest.config.argparsing import Parser
+from hypothesis import HealthCheck, Phase, settings
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = PROJECT_ROOT / "src"
@@ -58,3 +59,28 @@ def pytest_configure(config: Config) -> None:
             "pytest-cov is not installed; coverage options are ignored.",
             stacklevel=2,
         )
+
+
+# Register lean Hypothesis profiles and select via env HYPOTHESIS_PROFILE
+# - "ci": very small example counts, no database, suppress flaky health checks.
+# - "nightly": larger runs with shrinking, no deadlines.
+settings.register_profile(
+    "ci",
+    max_examples=8,
+    phases=(Phase.generate, Phase.shrink),
+    deadline=None,
+    derandomize=True,
+    suppress_health_check=[
+        HealthCheck.too_slow,
+        HealthCheck.filter_too_much,
+        HealthCheck.data_too_large,
+    ],
+    database=None,
+)
+settings.register_profile(
+    "nightly",
+    max_examples=200,
+    phases=(Phase.generate, Phase.shrink),
+    deadline=None,
+)
+settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "default"))

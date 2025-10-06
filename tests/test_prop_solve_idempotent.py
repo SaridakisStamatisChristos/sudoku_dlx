@@ -1,3 +1,5 @@
+import pytest
+
 from sudoku_dlx import generate, solve
 
 
@@ -14,6 +16,7 @@ def _is_full_valid(grid):
     return all(s == expect for s in rows + cols + boxes)
 
 
+@pytest.mark.prop
 def test_solve_idempotent_and_valid_small_seedset():
     # keep seeds small for CI speed
     for seed in [1, 3, 7]:
