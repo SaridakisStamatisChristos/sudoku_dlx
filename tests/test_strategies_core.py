@@ -4,7 +4,9 @@ from sudoku_dlx.strategies import (
     apply_box_line_claiming,
     apply_hidden_pair,
     apply_hidden_triple,
+    apply_hidden_single,
     apply_locked_candidates_pointing,
+    apply_naked_single,
     apply_naked_pair,
     apply_naked_triple,
     apply_x_wing,
@@ -25,6 +27,98 @@ def _clear_digit(cand: list[list[set[int]]], digit: int) -> None:
 def _set_candidates(cand: list[list[set[int]]], r: int, c: int, values: set[int]) -> None:
     cand[r][c].clear()
     cand[r][c].update(values)
+
+
+def test_naked_single_places_value() -> None:
+    grid = _empty_grid()
+    for c, value in enumerate(range(1, 9)):
+        grid[0][c] = value
+    cand = candidates(grid)
+
+    move = apply_naked_single(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "naked_single"
+    assert move["type"] == "place"
+    assert move["r"] == 0 and move["c"] == 8
+    assert move["v"] == 9
+    assert grid[0][8] == 9
+
+
+def test_hidden_single_row_metadata() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    digit = 7
+    _clear_digit(cand, digit)
+    cand[2][4].update({digit, 9})
+
+    move = apply_hidden_single(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "hidden_single"
+    assert move["unit"] == "row"
+    assert move["unit_index"] == 2
+    assert move["r"] == 2 and move["c"] == 4
+    assert move["v"] == digit
+    assert grid[2][4] == digit
+
+
+def test_hidden_single_column_metadata() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    digit = 5
+    _clear_digit(cand, digit)
+    cand[1][3].update({digit, 9})
+    cand[1][5].add(digit)
+
+    move = apply_hidden_single(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "hidden_single"
+    assert move["unit"] == "col"
+    assert move["unit_index"] == 3
+    assert move["r"] == 1 and move["c"] == 3
+    assert move["v"] == digit
+    assert grid[1][3] == digit
+
+
+def test_hidden_single_box_metadata() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    digit = 6
+    _clear_digit(cand, digit)
+    for r, c in (
+        (7, 7),
+        (7, 0),
+        (4, 7),
+        (4, 6),
+        (1, 6),
+        (1, 2),
+        (5, 2),
+        (5, 5),
+        (0, 5),
+        (0, 3),
+        (6, 3),
+        (6, 4),
+        (3, 4),
+        (3, 0),
+        (2, 0),
+        (2, 1),
+        (1, 1),
+        (2, 7),
+        (6, 1),
+    ):
+        cand[r][c].add(digit)
+
+    move = apply_hidden_single(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "hidden_single"
+    assert move["unit"] == "box"
+    assert move["unit_index"] == 8
+    assert move["r"] == 7 and move["c"] == 7
+    assert move["v"] == digit
+    assert grid[7][7] == digit
 
 
 def test_locked_candidates_pointing_row() -> None:
