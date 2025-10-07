@@ -214,6 +214,46 @@ def test_naked_pair_eliminates_other_candidates() -> None:
     assert move["remove"] not in cand[0][2]
 
 
+def test_naked_pair_column_eliminates_other_candidates() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    _clear_digit(cand, 4)
+    _clear_digit(cand, 5)
+    _clear_digit(cand, 6)
+    _set_candidates(cand, 0, 3, {4, 5})
+    _set_candidates(cand, 1, 3, {4, 5})
+    _set_candidates(cand, 4, 3, {4, 5, 6})
+
+    move = apply_naked_pair(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "naked_pair"
+    assert move["unit"] == "col" and move["unit_index"] == 3
+    assert move["r"] == 4 and move["c"] == 3
+    assert move["remove"] in (4, 5)
+    assert move["remove"] not in cand[4][3]
+
+
+def test_naked_pair_box_eliminates_other_candidates() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    _clear_digit(cand, 7)
+    _clear_digit(cand, 8)
+    _clear_digit(cand, 9)
+    _set_candidates(cand, 0, 0, {7, 8})
+    _set_candidates(cand, 1, 1, {7, 8})
+    _set_candidates(cand, 2, 2, {7, 8, 9})
+
+    move = apply_naked_pair(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "naked_pair"
+    assert move["unit"] == "box" and move["unit_index"] == 0
+    assert move["r"] == 2 and move["c"] == 2
+    assert move["remove"] in (7, 8)
+    assert move["remove"] not in cand[2][2]
+
+
 def test_hidden_pair_prunes_extras() -> None:
     grid = _empty_grid()
     cand = candidates(grid)
@@ -242,6 +282,82 @@ def test_hidden_pair_prunes_extras() -> None:
     assert move_second["remove"] == extra
     second_target = (move_second["r"], move_second["c"])
     assert cand[second_target[0]][second_target[1]] == {digit_a, digit_b}
+
+
+def test_hidden_pair_column_prunes_extras() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    digit_a, digit_b, extra = 4, 5, 6
+    for d in (digit_a, digit_b, extra):
+        _clear_digit(cand, d)
+    _set_candidates(cand, 0, 2, {digit_a, digit_b, extra})
+    _set_candidates(cand, 4, 2, {digit_a, digit_b, extra})
+
+    move = apply_hidden_pair(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "hidden_pair"
+    assert move["unit"] == "col" and move["unit_index"] == 2
+    first_target = (move["r"], move["c"])
+    assert cand[first_target[0]][first_target[1]] == {digit_a, digit_b}
+
+    move_second = apply_hidden_pair(grid, cand)
+
+    assert move_second is not None
+    assert move_second["strategy"] == "hidden_pair"
+    assert (move_second["r"], move_second["c"]) != first_target
+    assert cand[move_second["r"]][move_second["c"]] == {digit_a, digit_b}
+
+
+def test_hidden_pair_box_prunes_extras() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    digit_a, digit_b, extra = 1, 2, 3
+    for d in (digit_a, digit_b, extra):
+        _clear_digit(cand, d)
+    _set_candidates(cand, 3, 3, {digit_a, digit_b, extra})
+    _set_candidates(cand, 4, 4, {digit_a, digit_b, extra})
+
+    move = apply_hidden_pair(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "hidden_pair"
+    assert move["unit"] == "box" and move["unit_index"] == 4
+    first_target = (move["r"], move["c"])
+    assert cand[first_target[0]][first_target[1]] == {digit_a, digit_b}
+
+    move_second = apply_hidden_pair(grid, cand)
+
+    assert move_second is not None
+    assert move_second["strategy"] == "hidden_pair"
+    assert (move_second["r"], move_second["c"]) != first_target
+    assert cand[move_second["r"]][move_second["c"]] == {digit_a, digit_b}
+
+
+def test_hidden_pair_single_occurrence_path() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    digit_a, digit_b, extra_a, extra_b = 4, 6, 7, 8
+    for d in (digit_a, digit_b, extra_a, extra_b):
+        _clear_digit(cand, d)
+    _set_candidates(cand, 0, 5, {digit_a, digit_b, extra_a})
+    _set_candidates(cand, 0, 6, {digit_a, extra_b})
+
+    move = apply_hidden_pair(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "hidden_pair"
+    assert move["unit"] == "row" and move["unit_index"] == 0
+    target = (move["r"], move["c"])
+    assert target in ((0, 5), (0, 6))
+    assert cand[target[0]][target[1]] <= {digit_a, digit_b}
+
+    move_second = apply_hidden_pair(grid, cand)
+
+    assert move_second is not None
+    assert move_second["strategy"] == "hidden_pair"
+    assert (move_second["r"], move_second["c"]) != target
+    assert cand[move_second["r"]][move_second["c"]] <= {digit_a, digit_b}
 
 
 def test_naked_triple_clears_unit() -> None:
