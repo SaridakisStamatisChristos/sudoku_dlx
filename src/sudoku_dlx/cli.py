@@ -4,11 +4,12 @@ import argparse, sys, pathlib, csv, random, json, time, multiprocessing as mp
 from typing import Optional
 
 from .api import analyze, build_reveal_trace, from_string, is_valid, solve, to_string
-from .crosscheck import sat_solve
+from .crosscheck import sat_solve, cnf_dimacs_lines
 from .explain import explain
 from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
+from .formats import detect_format, read_grids, write_grids
 from statistics import mean
 
 
@@ -119,6 +120,44 @@ def cmd_check(ns: argparse.Namespace) -> int:
         print(json.dumps(data, separators=(",", ":"), sort_keys=True))
     else:
         _print_analysis(data)
+    return 0
+
+
+def cmd_convert(ns: argparse.Namespace) -> int:
+    infmt = ns.in_format or detect_format(ns.in_path)
+    outfmt = ns.out_format or detect_format(ns.out_path)
+    grids = read_grids(ns.in_path, infmt)
+    write_grids(ns.out_path, grids, outfmt)
+    print(f"# converted {len(grids)} grids {infmt} → {outfmt}", file=sys.stderr)
+    return 0
+
+
+def cmd_to_cnf(ns: argparse.Namespace) -> int:
+    grid = from_string(_read_grid_arg(ns))
+    outp = pathlib.Path(ns.out_path)
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    with outp.open("w", encoding="utf-8") as handle:
+        for line in cnf_dimacs_lines(grid):
+            handle.write(line)
+            if not line.endswith("\n"):
+                handle.write("\n")
+    return 0
+
+
+def cmd_explain_file(ns: argparse.Namespace) -> int:
+    inp = pathlib.Path(ns.in_path)
+    outp = pathlib.Path(ns.out_path)
+    grids = read_grids(str(inp), ns.in_format)
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    written = 0
+    with outp.open("w", encoding="utf-8") as handle:
+        for s in grids:
+            grid = from_string(s)
+            data = explain(grid, max_steps=ns.max_steps)
+            obj = {"grid": s, **data}
+            handle.write(json.dumps(obj, separators=(",", ":"), sort_keys=True) + "\n")
+            written += 1
+    print(f"# wrote {written} explanations to {outp}", file=sys.stderr)
     return 0
 
 
@@ -382,6 +421,26 @@ def main(argv: Optional[list[str]] = None) -> int:
     check_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
     check_parser.add_argument("--json", action="store_true", help="output JSON")
     check_parser.set_defaults(func=cmd_check)
+
+    convert_parser = sub.add_parser("convert", help="convert between txt/csv/jsonl formats")
+    convert_parser.add_argument("--in", dest="in_path", required=True)
+    convert_parser.add_argument("--out", dest="out_path", required=True)
+    convert_parser.add_argument("--in-format", dest="in_format", choices=["txt", "csv", "jsonl"])
+    convert_parser.add_argument("--out-format", dest="out_format", choices=["txt", "csv", "jsonl"])
+    convert_parser.set_defaults(func=cmd_convert)
+
+    tocnf_parser = sub.add_parser("to-cnf", help="export one puzzle to DIMACS CNF")
+    tocnf_parser.add_argument("--grid", help="81-char string; 0/./- for blanks")
+    tocnf_parser.add_argument("--file", help="path to a file with 9 lines of 9 chars")
+    tocnf_parser.add_argument("--out", dest="out_path", required=True)
+    tocnf_parser.set_defaults(func=cmd_to_cnf)
+
+    explainf_parser = sub.add_parser("explain-file", help="explain many puzzles into NDJSON")
+    explainf_parser.add_argument("--in", dest="in_path", required=True)
+    explainf_parser.add_argument("--out", dest="out_path", required=True)
+    explainf_parser.add_argument("--in-format", dest="in_format", choices=["txt", "csv", "jsonl"])
+    explainf_parser.add_argument("--max-steps", type=int, default=200)
+    explainf_parser.set_defaults(func=cmd_explain_file)
 
     explain_parser = sub.add_parser(
         "explain", help="human-style steps (naked/hidden single, locked candidates)"

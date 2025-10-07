@@ -2,6 +2,7 @@
 
 Run `sudoku-dlx --help` for a full list.
 
+<!-- core -->
 ## Solve
 ```bash
 sudoku-dlx solve --grid "<81chars>" [--pretty] [--stats] [--trace out.json] [--crosscheck sat]
@@ -43,4 +44,22 @@ sudoku-dlx rate-file --in puzzles.txt --json > scores.ndjson
 
 # Stats with sampling & histogram CSV
 sudoku-dlx stats-file --in puzzles.txt --limit 5000 --sample 1000 --json stats.json
+```
+
+<!-- extras -->
+## Convert formats
+```bash
+# auto-detects txt/csv/jsonl by extension
+sudoku-dlx convert --in puzzles.txt --out puzzles.csv
+sudoku-dlx convert --in puzzles.csv --out puzzles.jsonl
+```
+
+## Explain (batch)
+```bash
+sudoku-dlx explain-file --in puzzles.txt --out steps.ndjson --max-steps 200
+```
+
+## Export to DIMACS CNF
+```bash
+sudoku-dlx to-cnf --grid "<81chars>" --out puzzle.cnf
 ```
