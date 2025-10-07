@@ -66,3 +66,52 @@ def test_simple_coloring_one_elimination() -> None:
     assert move["strategy"] == "simple_coloring"
     assert move["digit"] == digit
     assert digit not in cand[move["r"]][move["c"]]
+
+
+def test_simple_coloring_reports_row_conflict_metadata() -> None:
+    grid = [[0] * 9 for _ in range(9)]
+    cand = candidates(grid)
+    digit = 4
+
+    for r in range(9):
+        for c in range(9):
+            cand[r][c].discard(digit)
+
+    # Build a coloring component where two same-colored nodes share row 1.
+    # Row 1 contains three candidates so no conjugate link is created there.
+    pattern = [(1, 1), (4, 1), (4, 7), (2, 7), (1, 8), (1, 4)]
+    for r, c in pattern:
+        cand[r][c].add(digit)
+
+    move = apply_simple_coloring(grid, cand)
+    assert move is not None
+    assert move["strategy"] == "simple_coloring"
+    assert move["digit"] == digit
+    assert move["unit"] == "row"
+    assert move["unit_index"] == 1
+    assert (move["r"], move["c"]) == (1, 1)
+    assert digit not in cand[1][1]
+
+
+def test_simple_coloring_reports_column_conflict_metadata() -> None:
+    grid = [[0] * 9 for _ in range(9)]
+    cand = candidates(grid)
+    digit = 6
+
+    for r in range(9):
+        for c in range(9):
+            cand[r][c].discard(digit)
+
+    # Analogous setup forcing two same-colored nodes to appear in column 1.
+    pattern = [(1, 1), (1, 4), (7, 4), (7, 2), (8, 1), (4, 1)]
+    for r, c in pattern:
+        cand[r][c].add(digit)
+
+    move = apply_simple_coloring(grid, cand)
+    assert move is not None
+    assert move["strategy"] == "simple_coloring"
+    assert move["digit"] == digit
+    assert move["unit"] == "col"
+    assert move["unit_index"] == 1
+    assert (move["r"], move["c"]) == (1, 1)
+    assert digit not in cand[1][1]
