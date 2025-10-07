@@ -21,3 +21,21 @@ sudoku-dlx stats-file --in puzzles.txt --limit 5000 --sample 1000 --json stats.j
 ```bash
 sudoku-dlx dedupe --in puzzles.txt --out unique.txt
 ```
+
+## Convert between formats
+Supported: txt (one 81-char per line), csv (column grid), jsonl/ndjson ({"grid": "..."} per line).
+```bash
+sudoku-dlx convert --in puzzles.txt --out puzzles.csv
+sudoku-dlx convert --in puzzles.csv --out puzzles.jsonl
+```
+
+## Batch explain
+Produce one JSON object per line with steps and progress:
+```bash
+sudoku-dlx explain-file --in puzzles.txt --out steps.ndjson --max-steps 200
+```
+
+## Export to CNF
+```bash
+sudoku-dlx to-cnf --grid "<81chars>" --out puzzle.cnf
+```

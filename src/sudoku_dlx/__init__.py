@@ -16,7 +16,8 @@ from .explain import explain
 from .canonical import canonical_form
 from .generate import generate
 from .rating import rate
-from .crosscheck import sat_solve
+from .crosscheck import sat_solve, cnf_dimacs_lines
+from .formats import read_grids, write_grids, detect_format
 from .solver import (
     SOLVER,
     generate_minimal,
@@ -46,6 +47,10 @@ __all__ = [
     "canonical_form",
     "generate",
     "sat_solve",
+    "cnf_dimacs_lines",
+    "read_grids",
+    "write_grids",
+    "detect_format",
     # Legacy exports
     "SOLVER",
     "generate_minimal",

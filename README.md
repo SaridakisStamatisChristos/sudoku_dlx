@@ -109,6 +109,22 @@ sudoku-dlx solve --grid "<81chars>" --trace out.json
 # Open web/visualizer.html and load out.json
 ```
 
+## Formats & batch explain
+Convert between txt/csv/jsonl:
+```bash
+sudoku-dlx convert --in puzzles.txt --out puzzles.csv
+```
+
+Explain many puzzles to NDJSON:
+```bash
+sudoku-dlx explain-file --in puzzles.txt --out steps.ndjson --max-steps 200
+```
+
+Export to DIMACS CNF:
+```bash
+sudoku-dlx to-cnf --grid "<81chars>" --out puzzle.cnf
+```
+
 ## Cross-check with SAT (optional)
 Install the optional extra:
 

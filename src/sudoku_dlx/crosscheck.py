@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """SAT cross-check utilities using python-sat (optional extra)."""
 
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 Grid = List[List[int]]
 
@@ -59,6 +59,18 @@ def _encode_cnf(grid: Grid) -> list[list[int]]:
     return cnf
 
 
+def cnf_dimacs_lines(grid: Grid) -> Iterable[str]:
+    """Yield DIMACS CNF lines for ``grid`` using variables in ``[1, 729]``."""
+
+    cnf = _encode_cnf(grid)
+    num_vars = 9 * 9 * 9
+    num_clauses = len(cnf)
+    yield f"p cnf {num_vars} {num_clauses}"
+    for clause in cnf:
+        literals = " ".join(str(int(lit)) for lit in clause)
+        yield f"{literals} 0"
+
+
 def sat_solve(grid: Grid) -> Optional[Grid]:
     """Solve a Sudoku grid via SAT; returns the solved grid or ``None`` if unavailable."""
 
@@ -83,4 +95,4 @@ def sat_solve(grid: Grid) -> Optional[Grid]:
     return solved
 
 
-__all__ = ["sat_solve"]
+__all__ = ["sat_solve", "cnf_dimacs_lines"]
