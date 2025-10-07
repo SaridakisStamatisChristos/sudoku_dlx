@@ -5,9 +5,15 @@ import os
 import sys
 from pathlib import Path
 
+if os.getenv("USE_HYPOTHESIS_STUB") == "1" or importlib.util.find_spec("hypothesis") is None:
+    stub_path = Path(__file__).parent / "_stubs"
+    stub_str = str(stub_path)
+    if stub_str not in sys.path:
+        sys.path.insert(0, stub_str)
+
 from _pytest.config import Config
 from _pytest.config.argparsing import Parser
-from hypothesis import HealthCheck, Phase, settings
+from hypothesis import HealthCheck, Phase, settings  # type: ignore
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = PROJECT_ROOT / "src"
