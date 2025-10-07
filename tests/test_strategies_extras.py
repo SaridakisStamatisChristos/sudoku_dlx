@@ -20,6 +20,34 @@ def test_swordfish_synthetic_single_elimination() -> None:
     assert digit not in cand[move["r"]][move["c"]]
 
 
+def test_swordfish_col_eliminates_extra_row_candidate() -> None:
+    grid = [[0] * 9 for _ in range(9)]
+    cand = candidates(grid)
+    digit = 7
+    rows = [0, 4, 8]
+    cols = [1, 4, 7]
+
+    for r in range(9):
+        for c in range(9):
+            cand[r][c].discard(digit)
+
+    for c in cols:
+        for r in rows:
+            cand[r][c].add(digit)
+
+    target_row = rows[0]
+    target_col = 0
+    cand[target_row][target_col].add(digit)
+
+    move = apply_swordfish(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "swordfish_col"
+    assert move["digit"] == digit
+    assert (move["r"], move["c"]) == (target_row, target_col)
+    assert digit not in cand[target_row][target_col]
+
+
 def test_simple_coloring_one_elimination() -> None:
     grid = [[0] * 9 for _ in range(9)]
     cand = candidates(grid)
