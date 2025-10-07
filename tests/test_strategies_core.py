@@ -175,6 +175,66 @@ def test_naked_triple_clears_unit() -> None:
     assert cand[target[0]][target[1]] == before[target] - {removed}
 
 
+def test_naked_triple_column_elimination() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    digits = (1, 2, 3, 4)
+    for d in digits:
+        _clear_digit(cand, d)
+    column = 5
+    triple_cells = ((0, column), (1, column), (2, column))
+    _set_candidates(cand, 0, column, {1, 2})
+    _set_candidates(cand, 1, column, {1, 3})
+    _set_candidates(cand, 2, column, {2, 3})
+    _set_candidates(cand, 3, column, {1, 4})
+
+    before = {pos: cand[pos[0]][pos[1]].copy() for pos in (*triple_cells, (3, column))}
+
+    move = apply_naked_triple(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "naked_triple"
+    assert move["unit"] == "col"
+    assert move["unit_index"] == column
+    target = (move["r"], move["c"])
+    removed = move["v"]
+
+    assert target[1] == column
+    assert target in before
+    assert removed in {1, 2, 3}
+    assert removed in before[target]
+    assert cand[target[0]][target[1]] == before[target] - {removed}
+
+
+def test_naked_triple_box_elimination() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    digits = (1, 2, 3, 4)
+    for d in digits:
+        _clear_digit(cand, d)
+    triple_cells = ((0, 0), (1, 1), (2, 2))
+    _set_candidates(cand, 0, 0, {1, 2})
+    _set_candidates(cand, 1, 1, {1, 3})
+    _set_candidates(cand, 2, 2, {2, 3})
+    _set_candidates(cand, 2, 0, {1, 4})
+
+    before = {pos: cand[pos[0]][pos[1]].copy() for pos in (*triple_cells, (2, 0))}
+
+    move = apply_naked_triple(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "naked_triple"
+    assert move["unit"] == "box"
+    assert move["unit_index"] == 0
+    target = (move["r"], move["c"])
+    removed = move["v"]
+
+    assert target in before
+    assert removed in {1, 2, 3}
+    assert removed in before[target]
+    assert cand[target[0]][target[1]] == before[target] - {removed}
+
+
 def test_hidden_triple_culls_extras() -> None:
     grid = _empty_grid()
     cand = candidates(grid)
@@ -192,6 +252,29 @@ def test_hidden_triple_culls_extras() -> None:
     assert move["strategy"] == "hidden_triple"
     assert move["r"] == 3 and move["c"] == 0
     assert extra not in cand[3][0]
+
+
+def test_hidden_triple_column_culls_extras() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+    triple = (4, 5, 6)
+    extra = 7
+    for d in (*triple, extra):
+        _clear_digit(cand, d)
+    column = 6
+    _set_candidates(cand, 0, column, {4, 5, 6, extra})
+    _set_candidates(cand, 3, column, {4, 5})
+    _set_candidates(cand, 7, column, {5, 6})
+
+    move = apply_hidden_triple(grid, cand)
+
+    assert move is not None
+    assert move["strategy"] == "hidden_triple"
+    assert move["unit"] == "col"
+    assert move["unit_index"] == column
+    assert move["r"] == 0 and move["c"] == column
+    assert move["remove"] == extra
+    assert cand[0][column] == set(triple)
 
 
 def test_x_wing_rows_then_cols() -> None:
