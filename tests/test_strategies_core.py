@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from sudoku_dlx.strategies import (
     apply_box_line_claiming,
     apply_hidden_pair,
+    apply_hidden_single,
     apply_hidden_triple,
     apply_hidden_single,
     apply_locked_candidates_pointing,
@@ -11,6 +14,7 @@ from sudoku_dlx.strategies import (
     apply_naked_triple,
     apply_x_wing,
     candidates,
+    step_once,
 )
 
 
@@ -320,3 +324,79 @@ def test_x_wing_rows_then_cols() -> None:
     assert move_col["strategy"] == "x_wing_col"
     assert move_col["digit"] == digit_col
     assert digit_col not in cand2[3][0]
+
+
+def test_step_once_prefers_naked_single_over_hidden_single() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+
+    _set_candidates(cand, 0, 0, {1})
+    _set_candidates(cand, 0, 1, {2, 3})
+    for c in range(9):
+        if c != 1:
+            cand[0][c].discard(2)
+
+    grid_hidden = [row[:] for row in grid]
+    cand_hidden = [[cell.copy() for cell in row] for row in cand]
+    hidden_move = apply_hidden_single(grid_hidden, cand_hidden)
+
+    assert hidden_move is not None
+    assert hidden_move["strategy"] == "hidden_single"
+
+    with patch("sudoku_dlx.strategies.candidates", return_value=cand):
+        move = step_once(grid)
+
+    assert move is not None
+    assert move["strategy"] == "naked_single"
+    assert move["r"] == 0 and move["c"] == 0
+    assert grid[0][0] == 1
+
+
+def test_step_once_prioritizes_locked_pointing_before_box_line() -> None:
+    grid = _empty_grid()
+    cand = candidates(grid)
+
+    for r in range(3):
+        for c in range(3):
+            cand[r][c].discard(1)
+    _set_candidates(cand, 0, 0, {1, 2})
+    _set_candidates(cand, 0, 1, {1, 3})
+    _set_candidates(cand, 0, 5, {1, 4, 5})
+
+    for c in range(9):
+        if c not in (3, 4):
+            cand[1][c].discard(4)
+    _set_candidates(cand, 1, 3, {4, 5})
+    _set_candidates(cand, 1, 4, {4, 6})
+    _set_candidates(cand, 0, 3, {2, 4, 7})
+
+    grid_locked = [row[:] for row in grid]
+    cand_locked = [[cell.copy() for cell in row] for row in cand]
+    locked_move = apply_locked_candidates_pointing(grid_locked, cand_locked)
+
+    assert locked_move is not None
+    assert locked_move["strategy"].startswith("locked_pointing")
+
+    grid_box_line = [row[:] for row in grid]
+    cand_box_line = [[cell.copy() for cell in row] for row in cand]
+    box_line_move = apply_box_line_claiming(grid_box_line, cand_box_line)
+
+    assert box_line_move is not None
+    assert box_line_move["strategy"].startswith("box_line")
+
+    with patch("sudoku_dlx.strategies.candidates", return_value=cand):
+        move = step_once(grid)
+
+    assert move is not None
+    assert move["strategy"].startswith("locked_pointing")
+    assert grid == _empty_grid()
+
+
+def test_step_once_returns_none_when_no_moves_available() -> None:
+    grid = _empty_grid()
+    snapshot = [row[:] for row in grid]
+
+    move = step_once(grid)
+
+    assert move is None
+    assert grid == snapshot
