@@ -1,9 +1,9 @@
 site_name: Sudoku DLX
-site_description: Fast Sudoku DLX (Algorithm X) with generator, analysis, and explainable steps.
+site_description: Deterministic bitset exact-cover Sudoku solver, generator, analyzer, and dataset toolkit.
 site_url: https://SaridakisStamatisChristos.github.io/sudoku_dlx/docs/
 repo_url: https://github.com/SaridakisStamatisChristos/sudoku_dlx
 repo_name: SaridakisStamatisChristos/sudoku_dlx
-copyright: "© 2025 Stamatis-Christos Saridakis. MIT."
+copyright: "© 2025–2026 Stamatis-Christos Saridakis. MIT."
 
 theme:
   name: material
@@ -33,6 +33,7 @@ nav:
   - Python API: api.md
   - Strategies: strategies.md
   - Batch & Datasets: batch.md
+  - v1.0 Hardening: V1_HARDENING.md
   - Changelog: changelog.md
 
 markdown_extensions:
