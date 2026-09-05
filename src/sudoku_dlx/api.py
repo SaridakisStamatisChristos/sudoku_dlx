@@ -53,6 +53,10 @@ def from_string(s: str) -> Grid:
             out[r][c] = 0
         elif ch in "123456789":
             out[r][c] = int(ch)
+        elif ch.isdigit():
+            # Preserve the 0.x diagnostic contract for non-ASCII numeric
+            # characters while accepting only ASCII Sudoku digits.
+            raise ValueError("digits must be 1..9")
         else:
             raise ValueError(f"bad char at {i}: {ch!r}")
     return out
