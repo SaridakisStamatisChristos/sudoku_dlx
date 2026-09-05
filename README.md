@@ -1,8 +1,10 @@
 # sudoku_dlx
 
-Fast **Sudoku** solver & generator using **Algorithm X / Dancing Links (DLX)** with Python bitsets and an incremental cover model. Exposes timing & search stats for reproducible benchmarking. Runs in the browser via Pyodide (demo linked below).
+A deterministic **Sudoku exact-cover toolkit** built around Algorithm X-style search with Python integer bitsets. It solves and counts solutions, generates unique puzzles, canonicalizes Sudoku isomorphs, explains puzzles with human-style strategies, processes datasets, and runs in the browser through Pyodide.
 
-> © 2025 Stamatis-Christos Saridakis — MIT. Core algorithm: exact cover (Knuth). This implementation is original and bitset-based.
+The project name retains “DLX” because the model and minimum-column search follow the exact-cover/Dancing Links tradition. The core does **not** use pointer-linked DLX nodes: the 729 candidate rows and 324 constraints are represented as compact Python bitsets with incremental cover operations.
+
+> © 2025–2026 Stamatis-Christos Saridakis — MIT License.
 
 [![CI](https://github.com/SaridakisStamatisChristos/sudoku_dlx/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SaridakisStamatisChristos/sudoku_dlx/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-mkdocs--material-blue)](https://SaridakisStamatisChristos.github.io/sudoku_dlx/docs/)
@@ -11,227 +13,186 @@ Fast **Sudoku** solver & generator using **Algorithm X / Dancing Links (DLX)** w
 [![PyPI version](https://img.shields.io/pypi/v/sudoku_dlx.svg)](https://pypi.org/project/sudoku_dlx/)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-demo-blue)](https://saridakisstamatischristos.github.io/sudoku_dlx/)
 
-## Features
-- Exact-cover Sudoku with **DLX** (no pointer structs; compact bitset encoding).
-- **Stats exposed**: elapsed ms, node visits, backtracks.
-- **Generator**: deterministic with `--seed`; removes clues while preserving **unique solvability** near a target clue count.
-- **Difficulty rater**: quick heuristic in `[0, 10]` from givens + search effort.
-- **CLI** (`sudoku-dlx`) + typed API + tests + CI + web demo.
+## What is included
 
-> Note: Current generator aims for *unique* puzzles near `target_givens`; **minimality** and **symmetry options** are planned (see Roadmap).
+- **Exact-cover solver:** 729 candidate assignments × 324 Sudoku constraints, minimum-column branching, optional naked-single prepass, first-solution solving, bounded solution counting, and iteration over solutions.
+- **Deterministic work statistics:** nodes, branches, failed branches/backtracks, maximum depth, and wall-clock time at the public API boundary.
+- **Unique puzzle generator:** deterministic seeds, approximate target clue count, strict minimality, rotational symmetry, and mixed removal mode.
+- **Canonicalization:** D4 board transforms, band/stack permutations, row/column permutations inside bands/stacks, and digit relabeling. The returned canonical form is an ordinary **row-major 81-character Sudoku string** and is idempotent.
+- **Difficulty v3:** deterministic `[0, 10]` heuristic derived from the canonical representative and machine-independent search-work features; timing is deliberately excluded.
+- **Human-style explainer:** singles, locked candidates, pairs, triples, X-Wing, Swordfish, and simple coloring.
+- **Independent SAT cross-check:** optional `python-sat` verification and DIMACS CNF export.
+- **Dataset tools:** batch generation, rating, analysis/statistics, format conversion, canonical deduplication, and batch explanation.
+- **Delivery:** typed Python package, CLI, tests/property tests, reproducible regression corpus, MkDocs, GitHub Pages/Pyodide demo, and release workflows.
 
-## Install (dev)
+## Install
+
+From a checkout:
+
 ```bash
 git clone https://github.com/SaridakisStamatisChristos/sudoku_dlx.git
 cd sudoku_dlx
-python -m venv .venv && source .venv/bin/activate  # Windows: .\.venv\Scripts\activate
-pip install -e ".[dev]"
-pre-commit install
+python -m venv .venv
+source .venv/bin/activate  # Windows: .\.venv\Scripts\activate
+python -m pip install -e ".[dev]"
 pytest -q
 ```
 
-### Difficulty (v2)
-Deterministic score in [0,10] combining:
-- empties (gaps), DLX nodes, backtracks, and fill pressure.
-Invariant under isomorphisms; avoids timing for stability.
+Optional independent SAT validation:
+
+```bash
+python -m pip install -e ".[sat]"
+```
+
+## Python API
+
+```python
+from sudoku_dlx import (
+    canonical_form,
+    count_solutions,
+    from_string,
+    generate,
+    rate,
+    solve,
+    to_string,
+)
+
+puzzle = from_string(
+    "53..7...."
+    "6..195..."
+    ".98....6."
+    "8...6...3"
+    "4..8.3..1"
+    "7...2...6"
+    ".6....28."
+    "...419..5"
+    "....8..79"
+)
+
+result = solve(puzzle)
+assert result is not None
+print(to_string(result.grid))
+print(result.stats)  # ms, nodes, backtracks, branches, max_depth
+
+assert count_solutions(puzzle, limit=2) == 1
+print("difficulty:", rate(puzzle))
+print("canonical:", canonical_form(puzzle))
+
+created = generate(seed=7331, target_givens=30, symmetry="mix")
+assert count_solutions(created, limit=2) == 1
+```
+
+Public `solve()` and `count_solutions()` calls own their search state, so concurrent callers do not share mutable solver statistics. The exported legacy `SOLVER` singleton remains for 0.x compatibility; new library code should prefer the public API or instantiate `BitDLX` directly when low-level control is required.
+
+## Generator semantics
+
+The generator always verifies uniqueness before returning.
+
+| Configuration | Guarantee |
+| --- | --- |
+| `symmetry="none"` | single-cell removals |
+| `symmetry="rot180"` | exact 180° clue-pattern symmetry |
+| `symmetry="mix"` | rotational removals first, then optional single-cell cleanup |
+| `minimal=True` with `none` / `mix` | strict single-clue minimality: removing any remaining clue destroys uniqueness |
+| `minimal=True, symmetry="rot180"` | rotational **orbit-minimality**: no complete rotational clue orbit can be removed while preserving uniqueness |
+
+Strict single-clue minimality and exact rotational symmetry are different constraints. The API does not silently break requested rotational symmetry in order to claim single-clue minimality.
+
+`target_givens` is an approximate lower target rather than a promise that every seed can reach exactly that clue count while preserving the requested constraints.
 
 ## CLI
 
 ```bash
 sudoku-dlx --help
 
-# Solve (single grid as 81 chars; '.' or '0' for blanks)
-sudoku-dlx solve --grid "..3.2.6..9..3.5..1..18.64..81.29..7....8....67..82.5......."
-sudoku-dlx solve --file puzzles.txt               # a file with 9 lines of 9 chars
+# Solve / count / inspect
 sudoku-dlx solve --grid "<81chars>" --pretty --stats
+sudoku-dlx check --grid "<81chars>" --json
+sudoku-dlx rate --grid "<81chars>"
 
-# Rate difficulty (0..10)
-sudoku-dlx rate  --grid "<81chars>"
+# Generate
+sudoku-dlx gen --seed 7331 --givens 30 --pretty
+sudoku-dlx gen --seed 7331 --givens 30 --minimal --symmetry rot180
+sudoku-dlx gen-batch --out puzzles.txt --count 1000 --givens 30 --parallel 8
 
-# Canonicalize (dedupe isomorphic puzzles)
-sudoku-dlx canon --grid "<81chars>"  # D4 × bands/stacks × inner row/col × digit relabel
-# Produces a stable 81-char string for deduping datasets.
-
-# Batch tools
-sudoku-dlx gen-batch --out puzzles.txt --count 1000 --givens 30 --symmetry rot180 --minimal
-sudoku-dlx rate-file --in puzzles.txt --csv ratings.csv
-python bench/bench_file.py --in puzzles.txt
-
-## Batch controls & parallel
-Generate with bounds and multiple processes:
-```bash
-sudoku-dlx gen-batch --out puzzles.txt --count 1000 --givens 30 \
-  --min-givens 28 --max-givens 40 --parallel 8
-```
-
-JSON output for ratings & sampling in stats:
-```bash
-sudoku-dlx rate-file  --in puzzles.txt --json > scores.ndjson
-sudoku-dlx stats-file --in puzzles.txt --limit 5000 --sample 1000 --json stats.json
-```
-
-# Dedupe a file of puzzles (fast)
+# Canonicalize and deduplicate isomorphic puzzles
+sudoku-dlx canon --grid "<81chars>"
 sudoku-dlx dedupe --in puzzles.txt --out unique.txt
 
-# Generate a unique puzzle (deterministic with seed)
-sudoku-dlx gen   --seed 123 --givens 30           # ~target clue count (approx)
-sudoku-dlx gen   --seed 123 --givens 30 --pretty
-# Analyze (valid/solvable/unique/difficulty/stats/canonical)
-sudoku-dlx check --grid "<81chars>"
-sudoku-dlx check --grid "<81chars>" --json > report.json
-
-# Explain (human-style)
+# Human-style explanation and batch tooling
 sudoku-dlx explain --grid "<81chars>" --json
-# Strategies include:
-#   - singles: naked single, hidden single (row/col/box)
-#   - locked candidates: pointing (box→line), claiming (line→box)
-#   - pairs: naked pair, hidden pair (row/col/box)
-#   - triples: naked triple, hidden triple (row/col/box)
-#   - fish: X-Wing (rows & columns)
-#   - advanced: Swordfish (rows & columns), Simple Coloring (Rule 2)
-# Deterministic steps for reproducible tutorials.
-
-# Dataset stats
-sudoku-dlx stats-file --in puzzles.txt --json stats.json --csv diff_hist.csv
-# prints a compact JSON summary to stdout and writes optional files using v2 difficulty:
-# {
-#   "count": 1000, "valid_pct": 100.0, "solvable_pct": 100.0, "unique_pct": 100.0,
-#   "givens_mean": 29.4, "difficulty_mean": 4.2, "difficulty_p90": 6.8, ...
-# }
-
-# Advanced generator flags:
-# Minimal & symmetry (slower; strict guarantee)
-sudoku-dlx gen   --seed 123 --givens 28 --minimal
-sudoku-dlx gen   --seed 123 --givens 28 --minimal --symmetry rot180
-
-# Trace & Visualize
-sudoku-dlx solve --grid "<81chars>" --trace out.json
-# Open web/visualizer.html and load out.json
-```
-
-## Formats & batch explain
-Convert between txt/csv/jsonl:
-```bash
-sudoku-dlx convert --in puzzles.txt --out puzzles.csv
-```
-
-Explain many puzzles to NDJSON:
-```bash
 sudoku-dlx explain-file --in puzzles.txt --out steps.ndjson --max-steps 200
-```
+sudoku-dlx rate-file --in puzzles.txt --csv ratings.csv
+sudoku-dlx stats-file --in puzzles.txt --json stats.json --csv diff_hist.csv
+sudoku-dlx convert --in puzzles.txt --out puzzles.csv
 
-Export to DIMACS CNF:
-```bash
+# SAT interoperability
 sudoku-dlx to-cnf --grid "<81chars>" --out puzzle.cnf
-```
-
-## Cross-check with SAT (optional)
-Install the optional extra:
-
-```bash
-pip install -e ".[sat]"
-```
-
-Then verify solutions using an independent SAT solver:
-
-```bash
 sudoku-dlx solve --grid "<81chars>" --crosscheck sat
 ```
 
-What this gives you
+For a reveal trace suitable for the browser visualizer:
 
-Strict minimality: after generation, removing any single clue breaks uniqueness.
-
-Symmetry enforcement: rot180 removals are paired; mix keeps pairs adjacent but allows singles too.
-
-CI-safe tests: fast settings, strong assertions.
-
-## Library (typed API)
-
-```python
-from sudoku_dlx import from_string, to_string, is_valid, solve, generate, rate
-
-# Parse and validate
-g = from_string("53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79")
-assert is_valid(g)
-
-# Solve with stats
-res = solve(g)
-if res is not None:
-    print("Solved (ms, nodes, backtracks):", res.stats.ms, res.stats.nodes, res.stats.backtracks)
-    print("Solution (81 chars):", to_string(res.grid))
-
-# Generate a unique puzzle near a target clue count
-p = generate(seed=42, target_givens=30)
-
-# Difficulty score in [0,10]
-print("difficulty:", rate(p))
+```bash
+sudoku-dlx solve --grid "<81chars>" --trace out.json
 ```
 
-### Stats
+## Canonicalization
 
-`solve()` returns `SolveResult(stats=Stats(ms, nodes, backtracks))`. These are also used by the rater.
+`canonical_form(grid)` maps supported Sudoku-preserving isomorphs to one stable representative. v1.0 explicitly separates the **internal block-major search key** used for prefix pruning from the **public row-major representation** returned to callers.
 
-### Difficulty rating
+Useful invariants covered by tests include:
 
 ```python
-from sudoku_dlx import rate, from_string
-g = from_string("53..7....6..195...." + "."*63)
-print(rate(g))  # e.g., 3.8
+c = canonical_form(puzzle)
+assert canonical_form(from_string(c)) == c
 ```
 
-## Roadmap
+and equality across D4 transforms, digit relabeling, band/stack permutations, and permitted inner row/column permutations.
 
-* Minimality guarantee and symmetry knobs for the generator
-* Isomorph class canonicalization (reject equivalent puzzles)
-* Optional DLX step recorder + visualizer
-* MUS/MCS-style minimality certificates
+## Difficulty rating
 
-## License
+Difficulty v3 is a reproducible engineering heuristic, not a claim to reproduce a particular newspaper or tournament scale. It combines clue sparsity with canonicalized exact-cover nodes, failed branches, and failure ratio. Timing is excluded so the score does not change merely because the machine or Python build changes.
 
-MIT — see LICENSE.
+## Correctness and independent validation
 
-## Publish to PyPI
+The test suite covers ordinary and adversarial solver cases, invalid inputs, uniqueness, generation/minimality, canonicalization invariants, explanation strategies, file/CLI behavior, concurrency/reentrancy, and property-based generation checks. Optional SAT cross-checking supplies an independent solving path.
 
-This repository is already structured as a Python package (`src` layout, metadata in `pyproject.toml`).
-To publish a new version on [PyPI](https://pypi.org/project/sudoku_dlx/):
+The nightly property workflow runs the heavier randomized/property profile separately from normal pull-request CI.
 
-1. Update `pyproject.toml` with the new `version` and adjust the changelog/release notes.
-2. Make sure the build backend is installed, then build the distribution artifacts:
+## Benchmarks and performance regression
 
-   ```bash
-   python -m pip install --upgrade build twine
-   python -m build  # creates dist/*.tar.gz and dist/*.whl
-   ```
+Run the deterministic regression gate:
 
-3. Upload the artifacts with [Twine](https://twine.readthedocs.io/):
+```bash
+python bench/regression.py
+```
 
-   ```bash
-   python -m twine upload dist/*
-   ```
+The checked-in corpus records solution count/solution and deterministic search-work counters. CI compares those counters exactly. Wall-clock milliseconds are printed but are intentionally **not** a hard gate on shared runners.
 
-4. Tag the release in Git and push the tag so GitHub releases stay in sync.
+For larger corpus timing:
 
-The CI workflow already runs tests against multiple Python versions and uploads coverage
-reports to Codecov; the `pages` workflow deploys the static demo from the `web/` directory.
+```bash
+python bench/bench_file.py --in puzzles.txt
+```
 
-### Automated releases (no auto-PyPI)
-On pushing a tag like `v0.2.1`, GitHub Actions will:
-- run tests against 3.10–3.12,
-- build wheels/sdist, and
-- attach artifacts to the GitHub Release (no PyPI upload).
+See [`bench/README.md`](bench/README.md) for the methodology and rules for updating the baseline. Performance claims should identify the corpus, commit, Python version, OS, CPU, and command used; this project does not claim “fastest” or “state of the art” without reproducible comparative evidence.
 
-**Release gates**:
-- `twine check` validates the built metadata.
-- tag `vX.Y.Z` must equal `sudoku_dlx.__version__` (build fails if not).
-- installs the wheel and imports the package before attaching.
+## CI and release gates
 
-### Manual publish (when you’re ready)
-1. Create a token on PyPI (or TestPyPI).
-2. Add a repo secret:
-   - **Settings → Secrets and variables → Actions**
-   - New secrets: `PYPI_API_TOKEN` (and/or `TEST_PYPI_API_TOKEN`)
-3. From **Actions** tab, run **publish**:
-   - Choose **pypi** or **testpypi**
-   - Optionally set **ref** (leave blank to use default branch HEAD)
-4. The workflow builds and uploads the current code to the chosen index.
+Pull requests run:
+
+- CPython 3.10–3.14 tests on Linux
+- Windows and macOS core smoke tests
+- deterministic search-work regression checks
+- strict MkDocs build
+- wheel + sdist build and `twine check`
+- clean wheel installation/import
+
+Tag releases additionally verify that `vX.Y.Z` matches `sudoku_dlx.__version__` before attaching distributions to a GitHub Release. PyPI publication remains an explicit/manual workflow.
+
+## License and citation
+
+MIT — see [`LICENSE`](LICENSE).
+
+Citation metadata is provided in [`CITATION.cff`](CITATION.cff).
