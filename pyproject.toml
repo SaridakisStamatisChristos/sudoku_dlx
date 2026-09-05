@@ -4,39 +4,52 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sudoku_dlx"
-version = "0.2.0"
-description = "Fast Sudoku DLX (Algorithm X) with Python bitsets; generator for minimal unique puzzles."
+version = "1.0.0"
+description = "Deterministic bitset exact-cover Sudoku solver, generator, analyzer, and dataset toolkit."
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Stamatis-Christos Saridakis" }]
 requires-python = ">=3.10"
 dependencies = []
 classifiers = [
+  "Development Status :: 5 - Production/Stable",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "License :: OSI Approved :: MIT License",
   "Intended Audience :: Developers",
   "Topic :: Games/Entertainment :: Puzzle Games",
+  "Topic :: Scientific/Engineering",
   "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
 ]
 
 [project.scripts]
 sudoku-dlx = "sudoku_dlx.cli:main"
 
-[tool.poetry.scripts]
-sudoku-dlx = "sudoku_dlx.cli:main"
-
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6", "black>=24.8", "pre-commit>=3.7", "hypothesis>=6.113",
-       "mkdocs>=1.6", "mkdocs-material>=9.5"]
-# optional solver cross-checkers
+dev = [
+  "black>=24.8",
+  "hypothesis>=6.113",
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "pre-commit>=3.7",
+  "pytest>=8",
+  "pytest-cov>=5",
+  "ruff>=0.6",
+]
 sat = ["python-sat>=0.1.8"]
 
 [project.urls]
 Homepage = "https://github.com/SaridakisStamatisChristos/sudoku_dlx"
+Documentation = "https://SaridakisStamatisChristos.github.io/sudoku_dlx/docs/"
 Repository = "https://github.com/SaridakisStamatisChristos/sudoku_dlx"
 Issues = "https://github.com/SaridakisStamatisChristos/sudoku_dlx/issues"
-Changelog = "https://github.com/SaridakisStamatisChristos/sudoku_dlx/releases"
+Changelog = "https://github.com/SaridakisStamatisChristos/sudoku_dlx/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -54,8 +67,14 @@ target-version = ["py310"]
 
 [tool.ruff]
 line-length = 100
-select = ["E","F","I","B","UP"]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
 
 [tool.pytest.ini_options]
 addopts = "-q --cov=sudoku_dlx --cov-report=xml --cov-report=term-missing"
 testpaths = ["tests"]
+markers = [
+  "prop: property-based or extended randomized tests",
+]
