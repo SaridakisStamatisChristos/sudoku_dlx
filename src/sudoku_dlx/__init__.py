@@ -4,22 +4,24 @@ from .api import (
     Grid,
     SolveResult,
     Stats,
+    analyze,
+    build_reveal_trace,
     count_solutions,
     from_string,
     is_valid,
-    analyze,
+    is_well_formed,
     solve,
     to_string,
-    build_reveal_trace,
 )
-from .explain import explain
 from .canonical import canonical_form
+from .crosscheck import cnf_dimacs_lines, sat_solve
+from .explain import explain
+from .formats import detect_format, read_grids, write_grids
 from .generate import generate
-from .rating import rate
-from .crosscheck import sat_solve, cnf_dimacs_lines
-from .formats import read_grids, write_grids, detect_format
+from .rating import DIFFICULTY_VERSION, rate
 from .solver import (
     SOLVER,
+    from_string as legacy_from_string,
     generate_minimal,
     grid_clues,
     hardness_estimate,
@@ -27,7 +29,6 @@ from .solver import (
     print_grid,
     set_seed,
     to_string as legacy_to_string,
-    from_string as legacy_from_string,
     validate_grid,
 )
 
@@ -38,12 +39,14 @@ __all__ = [
     "from_string",
     "to_string",
     "build_reveal_trace",
+    "is_well_formed",
     "is_valid",
     "solve",
     "analyze",
     "count_solutions",
     "explain",
     "rate",
+    "DIFFICULTY_VERSION",
     "canonical_form",
     "generate",
     "sat_solve",
@@ -51,7 +54,7 @@ __all__ = [
     "read_grids",
     "write_grids",
     "detect_format",
-    # Legacy exports
+    # Compatibility exports retained for existing 0.x users.
     "SOLVER",
     "generate_minimal",
     "is_minimal",
@@ -64,4 +67,4 @@ __all__ = [
     "legacy_to_string",
 ]
 
-__version__ = "0.2.0"
+__version__ = "1.0.0"
