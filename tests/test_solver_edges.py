@@ -1,6 +1,7 @@
 import math
 
 from sudoku_dlx.solver import (
+    ALL_ROWS_MASK,
     BitDLX,
     SOLVER,
     deduce_singles_from_clues,
@@ -19,17 +20,14 @@ from sudoku_dlx.solver import (
 )
 
 
-def test_dlx_search_handles_missing_column(monkeypatch):
+def test_choose_col_handles_no_active_columns():
     solver = BitDLX()
-    monkeypatch.setattr(solver, "_choose_col", lambda rows_mask, cols_mask: None)
-    result = solver._search(1, 1, limit=1, keep_one=False, collect_sol=[], found=[0])
-    assert result is False
+    assert solver._choose_col(ALL_ROWS_MASK, 0) is None
 
 
-def test_dlx_search_handles_empty_candidates():
+def test_choose_col_detects_empty_candidate_column():
     solver = BitDLX()
-    result = solver._search(0, 1, limit=1, keep_one=False, collect_sol=[], found=[0])
-    assert result is False
+    assert solver._choose_col(0, 1) == 0
 
 
 def test_count_solutions_prepass_conflict():
@@ -44,14 +42,9 @@ def test_count_solutions_invalid_row():
     assert (cnt, grid) == (0, None)
 
 
-def test_count_solutions_no_solution_when_search_fails(monkeypatch):
+def test_count_solutions_rejects_constraint_conflict_without_prepass():
     solver = BitDLX()
-
-    def fake_search(rows_mask, cols_mask, limit, keep_one, collect_sol, found, depth=0):
-        return False
-
-    monkeypatch.setattr(solver, "_search", fake_search)
-    cnt, grid = solver.count_solutions([(0, 0, 1)], prepass=False)
+    cnt, grid = solver.count_solutions([(0, 0, 1), (0, 1, 1)], prepass=False)
     assert (cnt, grid) == (0, None)
 
 
