@@ -27,7 +27,7 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: pyproject.toml
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v4
 
       - name: Install docs dependencies
         run: |
@@ -42,7 +42,7 @@ jobs:
           mkdocs build --strict --site-dir _pages/docs
 
       - name: Upload combined Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./_pages
 
