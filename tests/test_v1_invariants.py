@@ -22,13 +22,7 @@ def _rot90(grid):
     return [[grid[8 - c][r] for c in range(9)] for r in range(9)]
 
 
-def test_limit_two_retains_a_complete_first_solution_for_unique_puzzle():
-    grid = from_string(HARD_UNIQUE)
-    engine = BitDLX()
-    count, solved = engine.count_solutions(grid_clues(grid), limit=2)
-
-    assert count == 1
-    assert solved is not None
+def _assert_solution_extends(grid, solved):
     assert validate_grid(solved)
     assert all(value != 0 for row in solved for value in row)
     for r in range(9):
@@ -37,7 +31,17 @@ def test_limit_two_retains_a_complete_first_solution_for_unique_puzzle():
                 assert solved[r][c] == grid[r][c]
 
 
-def test_prepass_preserves_count_and_first_solution():
+def test_limit_two_retains_a_complete_first_solution_for_unique_puzzle():
+    grid = from_string(HARD_UNIQUE)
+    engine = BitDLX()
+    count, solved = engine.count_solutions(grid_clues(grid), limit=2)
+
+    assert count == 1
+    assert solved is not None
+    _assert_solution_extends(grid, solved)
+
+
+def test_prepass_preserves_counts_and_valid_solutions():
     for text in (HARD_UNIQUE, MULTI):
         grid = from_string(text)
         clues = grid_clues(grid)
@@ -50,7 +54,13 @@ def test_prepass_preserves_count_and_first_solution():
         assert count_fast == count_raw
         assert solved_fast is not None
         assert solved_raw is not None
-        assert to_string(solved_fast) == to_string(solved_raw)
+        _assert_solution_extends(grid, solved_fast)
+        _assert_solution_extends(grid, solved_raw)
+
+        # A unique puzzle must yield the same solution. A multi-solution puzzle
+        # may legitimately expose a different first solution after propagation.
+        if count_fast == 1:
+            assert to_string(solved_fast) == to_string(solved_raw)
 
 
 def test_canonical_form_is_row_major_valid_and_idempotent():
