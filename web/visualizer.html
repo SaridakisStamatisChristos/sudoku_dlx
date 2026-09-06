@@ -1,119 +1,182 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sudoku DLX — Solution Replay</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Replay sudoku_dlx solution_reveal traces in the browser.">
+  <title>sudoku_dlx — Trace Replay</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
-    .grid { border-collapse: collapse; margin: 16px 0; }
-    .grid td { width: 32px; height: 32px; text-align: center; font-size: 18px; border: 1px solid #ccc; }
-    .grid td.bold-right { border-right: 2px solid #000; }
-    .grid td.bold-bottom { border-bottom: 2px solid #000; }
-    .stats { margin: 8px 0; color: #444; }
-    .controls button { margin-right: 8px; }
-    .filled { background: #eaf7ff; }
-    .given  { background: #f6f6f6; font-weight: 600; }
+    :root {
+      color-scheme: light dark;
+      --bg:#f4f6f8; --panel:#fff; --soft:#f8fafc; --text:#101828; --muted:#667085;
+      --line:#d0d5dd; --strong:#344054; --accent:#175cd3; --given:#eef2f6; --fill:#eff8ff;
+      --shadow:0 16px 48px rgba(16,24,40,.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:#0b0f17; --panel:#121826; --soft:#171f2f; --text:#f2f4f7; --muted:#98a2b3;
+        --line:#344054; --strong:#d0d5dd; --accent:#84adff; --given:#1d2939; --fill:#102a43;
+        --shadow:0 16px 48px rgba(0,0,0,.28);
+      }
+    }
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+    a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+    .shell{width:min(920px,calc(100% - 28px));margin:0 auto;padding:34px 0 54px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:28px;font-size:14px}
+    .brand{font-weight:800;letter-spacing:-.02em}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:clamp(16px,4vw,28px)}
+    h1{font-size:clamp(30px,5vw,48px);letter-spacing:-.045em;margin:0 0 10px}.lede{color:var(--muted);line-height:1.55;margin:0 0 24px}
+    .loader{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px;background:var(--soft);border:1px solid var(--line);border-radius:12px}
+    input[type=file]{max-width:100%}.stats{margin:16px 0;color:var(--muted);font-size:13px;min-height:20px}
+    .stage{display:grid;grid-template-columns:minmax(280px,520px) minmax(180px,1fr);gap:24px;align-items:start}
+    .grid{display:grid;grid-template-columns:repeat(9,1fr);aspect-ratio:1;border:2px solid var(--strong);background:var(--strong);gap:1px;border-radius:10px;overflow:hidden}
+    .cell{display:grid;place-items:center;background:var(--panel);font-size:clamp(18px,4vw,28px);font-weight:600;min-width:0}.cell.given{background:var(--given);font-weight:820}.cell.filled{background:var(--fill);color:var(--accent)}
+    .cell.box-right{border-right:2px solid var(--strong)}.cell.box-bottom{border-bottom:2px solid var(--strong)}
+    .controls{display:grid;gap:10px}.controls .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}button{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--soft);color:var(--text);cursor:pointer;font-weight:680}button:hover:not(:disabled){border-color:var(--strong)}button:disabled{opacity:.45;cursor:not-allowed}button.primary{background:var(--text);color:var(--panel);border-color:var(--text)}
+    label{display:grid;gap:6px;color:var(--muted);font-size:12px;font-weight:650}input[type=range]{width:100%}.step{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--soft);font-size:13px;line-height:1.5}.step strong{display:block;font-size:18px;color:var(--text)}
+    .error{color:#b42318}.foot{margin-top:20px;color:var(--muted);font-size:12px;line-height:1.5}
+    @media(max-width:720px){.stage{grid-template-columns:1fr}.controls{grid-template-columns:1fr}.shell{padding-top:20px}}
   </style>
 </head>
 <body>
-  <h1>Sudoku DLX — Solution Replay</h1>
-  <p>Load a <code>solution_reveal</code> JSON produced by <code>sudoku-dlx solve --trace out.json</code>.</p>
-  <input type="file" id="file" accept="application/json" />
-  <div class="stats" id="stats"></div>
-  <div class="controls">
-    <button id="btn-begin" disabled>&laquo; Begin</button>
-    <button id="btn-prev" disabled>&lsaquo; Step</button>
-    <button id="btn-play" disabled>Play</button>
-    <button id="btn-next" disabled>Step &rsaquo;</button>
-    <button id="btn-end" disabled>End &raquo;</button>
-  </div>
-  <table class="grid" id="grid"></table>
+  <main class="shell">
+    <div class="top"><div class="brand">sudoku_dlx · trace replay</div><div><a href="./">Browser Lab</a> · <a href="./docs/">Docs</a> · <a href="https://github.com/SaridakisStamatisChristos/sudoku_dlx">GitHub</a></div></div>
+    <section class="card">
+      <h1>Replay a solution trace.</h1>
+      <p class="lede">Load a stable <code>solution_reveal</code> JSON produced by <code>sudoku-dlx solve --trace out.json</code>. This visualizer replays presentation steps without depending on internal cover/uncover implementation details.</p>
+      <div class="loader"><input type="file" id="file" accept="application/json,.json"><span id="fileStatus">Choose a trace file.</span></div>
+      <div class="stats" id="stats"></div>
+      <div class="stage">
+        <div class="grid" id="grid" aria-label="Sudoku replay grid"></div>
+        <aside class="controls">
+          <div class="step"><span>Position</span><strong id="position">0 / 0</strong><span id="stepDetail">Load a trace to begin.</span></div>
+          <div class="row"><button id="begin" disabled>« Begin</button><button id="end" disabled>End »</button></div>
+          <div class="row"><button id="prev" disabled>‹ Step</button><button id="next" disabled>Step ›</button></div>
+          <button id="play" class="primary" disabled>Play</button>
+          <label>Playback speed
+            <input id="speed" type="range" min="40" max="700" step="20" value="180">
+          </label>
+        </aside>
+      </div>
+      <div class="foot">© 2025–2026 Stamatis-Christos Saridakis · MIT · <code>solution_reveal</code> format <code>reveal-1</code>.</div>
+    </section>
+  </main>
 
   <script>
-    const gridEl = document.getElementById('grid');
-    const statsEl = document.getElementById('stats');
-    let trace = null, idx = 0, playing = null, initial = null, givenMask = null;
+    const gridEl = document.getElementById("grid");
+    const statsEl = document.getElementById("stats");
+    const fileStatus = document.getElementById("fileStatus");
+    const positionEl = document.getElementById("position");
+    const stepDetail = document.getElementById("stepDetail");
+    const buttons = {
+      begin: document.getElementById("begin"), end: document.getElementById("end"),
+      prev: document.getElementById("prev"), next: document.getElementById("next"), play: document.getElementById("play")
+    };
+    const speed = document.getElementById("speed");
+    let trace = null, index = 0, timer = null;
 
     function buildGrid() {
-      gridEl.innerHTML = '';
-      for (let r = 0; r < 9; r++) {
-        const tr = document.createElement('tr');
-        for (let c = 0; c < 9; c++) {
-          const td = document.createElement('td');
-          td.id = `cell-${r}-${c}`;
-          if ((c+1) % 3 === 0 && c < 8) td.classList.add('bold-right');
-          if ((r+1) % 3 === 0 && r < 8) td.classList.add('bold-bottom');
-          tr.appendChild(td);
-        }
-        gridEl.appendChild(tr);
+      gridEl.innerHTML = "";
+      for (let i = 0; i < 81; i++) {
+        const cell = document.createElement("div");
+        const r = Math.floor(i / 9), c = i % 9;
+        cell.id = `cell-${i}`;
+        cell.className = "cell";
+        if (c === 2 || c === 5) cell.classList.add("box-right");
+        if (r === 2 || r === 5) cell.classList.add("box-bottom");
+        gridEl.appendChild(cell);
       }
-    }
-    function setCell(r,c,val,klass) {
-      const td = document.getElementById(`cell-${r}-${c}`);
-      td.textContent = val || '';
-      td.classList.remove('filled', 'given');
-      if (klass) td.classList.add(klass);
-    }
-    function loadInitial(initial81) {
-      initial = initial81;
-      givenMask = [];
-      for (let i=0;i<81;i++) {
-        const r = Math.floor(i/9), c = i%9;
-        const ch = initial81[i];
-        const isGiven = ch !== '.';
-        givenMask.push(isGiven);
-        setCell(r,c,isGiven ? ch : '', isGiven ? 'given' : null);
-      }
-    }
-    function replayTo(k) {
-      // reset to initial
-      loadInitial(initial);
-      for (let i=0;i<k;i++) {
-        const {r,c,v} = trace.steps[i];
-        setCell(r,c,String(v),'filled');
-      }
-      idx = k;
-      updateButtons();
-    }
-    function updateButtons() {
-      const disabled = !trace;
-      document.getElementById('btn-begin').disabled = disabled || idx===0;
-      document.getElementById('btn-prev').disabled  = disabled || idx===0;
-      document.getElementById('btn-next').disabled  = disabled || idx>=trace.steps.length;
-      document.getElementById('btn-end').disabled   = disabled || idx>=trace.steps.length;
-      document.getElementById('btn-play').disabled  = disabled;
-      document.getElementById('btn-play').textContent = playing ? 'Pause' : 'Play';
     }
 
-    document.getElementById('file').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
+    function validateTrace(data) {
+      if (!data || data.kind !== "solution_reveal" || data.version !== "reveal-1") throw new Error("Expected a solution_reveal / reveal-1 trace.");
+      if (typeof data.initial !== "string" || data.initial.length !== 81) throw new Error("Trace initial grid must contain 81 characters.");
+      if (!Array.isArray(data.steps)) throw new Error("Trace steps are missing.");
+      for (const step of data.steps) {
+        if (![step.r, step.c, step.v].every(Number.isInteger) || step.r < 0 || step.r > 8 || step.c < 0 || step.c > 8 || step.v < 1 || step.v > 9) {
+          throw new Error("Trace contains an invalid reveal step.");
+        }
+      }
+    }
+
+    function render(k) {
+      if (!trace) return;
+      const initial = trace.initial;
+      for (let i = 0; i < 81; i++) {
+        const cell = document.getElementById(`cell-${i}`);
+        const ch = initial[i];
+        cell.textContent = ch === "." ? "" : ch;
+        cell.classList.toggle("given", ch !== ".");
+        cell.classList.remove("filled");
+      }
+      for (let i = 0; i < k; i++) {
+        const step = trace.steps[i];
+        const cell = document.getElementById(`cell-${step.r * 9 + step.c}`);
+        cell.textContent = String(step.v);
+        cell.classList.add("filled");
+      }
+      index = k;
+      positionEl.textContent = `${index} / ${trace.steps.length}`;
+      if (index === 0) stepDetail.textContent = "Initial puzzle.";
+      else {
+        const step = trace.steps[index - 1];
+        stepDetail.textContent = `Placed ${step.v} at row ${step.r + 1}, column ${step.c + 1}.`;
+      }
+      updateControls();
+    }
+
+    function updateControls() {
+      const absent = !trace;
+      buttons.begin.disabled = absent || index === 0;
+      buttons.prev.disabled = absent || index === 0;
+      buttons.next.disabled = absent || index >= (trace?.steps.length || 0);
+      buttons.end.disabled = absent || index >= (trace?.steps.length || 0);
+      buttons.play.disabled = absent;
+      buttons.play.textContent = timer ? "Pause" : "Play";
+    }
+
+    function stop() { if (timer) clearInterval(timer); timer = null; updateControls(); }
+    function start() {
+      stop();
+      timer = setInterval(() => {
+        if (!trace || index >= trace.steps.length) { stop(); return; }
+        render(index + 1);
+      }, Number(speed.value));
+      updateControls();
+    }
+
+    document.getElementById("file").addEventListener("change", async (event) => {
+      stop();
+      const file = event.target.files?.[0];
       if (!file) return;
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (data.kind !== 'solution_reveal') { alert('Unexpected trace kind'); return; }
-      trace = data; idx = 0;
-      buildGrid();
-      loadInitial(trace.initial);
-      statsEl.textContent = `steps: ${trace.steps.length} · ${trace.stats.ms} ms · nodes ${trace.stats.nodes} · backtracks ${trace.stats.backtracks}`;
-      updateButtons();
+      try {
+        const data = JSON.parse(await file.text());
+        validateTrace(data);
+        trace = data;
+        fileStatus.textContent = file.name;
+        fileStatus.className = "";
+        const stats = data.stats || {};
+        statsEl.textContent = `${data.steps.length} reveal steps · ${stats.ms ?? "—"} ms · ${stats.nodes ?? "—"} nodes · ${stats.backtracks ?? "—"} backtracks`;
+        render(0);
+      } catch (error) {
+        trace = null;
+        fileStatus.textContent = error.message;
+        fileStatus.className = "error";
+        statsEl.textContent = "";
+        positionEl.textContent = "0 / 0";
+        stepDetail.textContent = "Could not load trace.";
+        updateControls();
+      }
     });
 
-    document.getElementById('btn-begin').onclick = () => replayTo(0);
-    document.getElementById('btn-prev').onclick  = () => replayTo(Math.max(0, idx-1));
-    document.getElementById('btn-next').onclick  = () => replayTo(Math.min(trace.steps.length, idx+1));
-    document.getElementById('btn-end').onclick   = () => replayTo(trace.steps.length);
-    document.getElementById('btn-play').onclick  = () => {
-      if (!trace) return;
-      if (playing) { clearInterval(playing); playing = null; updateButtons(); return; }
-      playing = setInterval(() => {
-        if (idx >= trace.steps.length) { clearInterval(playing); playing = null; updateButtons(); return; }
-        replayTo(idx+1);
-      }, 60);
-      updateButtons();
-    };
+    buttons.begin.onclick = () => { stop(); render(0); };
+    buttons.prev.onclick = () => { stop(); render(Math.max(0, index - 1)); };
+    buttons.next.onclick = () => { stop(); render(Math.min(trace.steps.length, index + 1)); };
+    buttons.end.onclick = () => { stop(); render(trace.steps.length); };
+    buttons.play.onclick = () => timer ? stop() : start();
+    speed.addEventListener("input", () => { if (timer) start(); });
 
     buildGrid();
+    updateControls();
   </script>
 </body>
 </html>
