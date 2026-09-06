@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## [1.0.1] - 2026-09-06
+
+### Fixes
+
+- Fixed the human explanation engine so candidate eliminations persist across logical steps instead of being recomputed away from the unchanged grid.
+- Placements now refresh only newly illegal candidates while preserving earlier logical eliminations.
+- Added contradiction guards for impossible candidate states produced during a logical explanation run.
+- Added regression coverage proving an elimination can enable a subsequent placement without being repeated or forgotten.
+
 ## [1.0.0] - 2026-09-06
 
 ### Correctness

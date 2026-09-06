@@ -2,6 +2,12 @@
 
 For the complete release history, see the repository-level `CHANGELOG.md`.
 
+## 1.0.1 — 2026-09-06
+
+- Human explanations now preserve candidate eliminations across logical steps.
+- Placements refresh legal candidates without resurrecting prior eliminations.
+- Added contradiction guards and regression coverage for elimination-to-placement progress.
+
 ## 1.0.0 — 2026-09-06
 
 - Correct first-solution retention while bounded counting continues to establish uniqueness.

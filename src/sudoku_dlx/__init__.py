@@ -67,4 +67,4 @@ __all__ = [
     "legacy_to_string",
 ]
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
