@@ -539,6 +539,14 @@ def generate_minimal(
     seed: Optional[int] = None,
     rng: Optional[random.Random] = None,
 ) -> tuple[Grid, Grid]:
+    """Generate a unique legacy puzzle while honoring the requested symmetry contract.
+
+    ``none`` and ``mix`` finish with strict single-clue minimality. ``rot180``
+    preserves exact 180-degree clue-pattern symmetry and therefore finishes with
+    orbit-minimality: no remaining rotational clue orbit can be removed while
+    retaining uniqueness.
+    """
+
     if type(target_clues) is not int or not 17 <= target_clues <= 81:
         raise ValueError("target_clues must be an integer in 17..81")
     if type(max_rounds) is not int or max_rounds < 0:
@@ -597,21 +605,67 @@ def generate_minimal(
             if not unique(puzzle):
                 puzzle[r][c] = backup
 
-    # Strict single-clue minimality for the legacy function. For exact
-    # rotational symmetry use the modern generate(..., symmetry="rot180")
-    # without the strict-minimal post-pass.
-    changed = True
-    while changed:
-        changed = False
-        filled = [(r, c) for r in range(9) for c in range(9) if puzzle[r][c] != 0]
-        rng.shuffle(filled)
-        for r, c in filled:
-            backup = puzzle[r][c]
-            puzzle[r][c] = 0
-            if unique(puzzle):
-                changed = True
-            else:
-                puzzle[r][c] = backup
+    if symmetry == "rot180":
+        # Preserve symmetry during the minimality pass by removing complete
+        # rotational orbits (paired clues, plus the center cell) atomically.
+        changed = True
+        while changed:
+            changed = False
+            pairs = rot180_pairs()
+            rng.shuffle(pairs)
+            for (r1, c1), (r2, c2) in pairs:
+                present = []
+                if puzzle[r1][c1] != 0:
+                    present.append((r1, c1, puzzle[r1][c1]))
+                if (r2, c2) != (r1, c1) and puzzle[r2][c2] != 0:
+                    present.append((r2, c2, puzzle[r2][c2]))
+                if not present:
+                    continue
+                for r, c, _ in present:
+                    puzzle[r][c] = 0
+                if unique(puzzle):
+                    changed = True
+                else:
+                    for r, c, value in present:
+                        puzzle[r][c] = value
+
+        # The legacy API now has the same explicit rot180 semantics as the
+        # modern generator: exact clue-pattern symmetry plus orbit-minimality.
+        for r in range(9):
+            for c in range(9):
+                if (puzzle[r][c] != 0) != (puzzle[8 - r][8 - c] != 0):
+                    raise AssertionError("legacy generator violated rot180 clue-pattern symmetry")
+
+        for (r1, c1), (r2, c2) in rot180_pairs():
+            present = []
+            if puzzle[r1][c1] != 0:
+                present.append((r1, c1, puzzle[r1][c1]))
+            if (r2, c2) != (r1, c1) and puzzle[r2][c2] != 0:
+                present.append((r2, c2, puzzle[r2][c2]))
+            if not present:
+                continue
+            for r, c, _ in present:
+                puzzle[r][c] = 0
+            still_unique = unique(puzzle)
+            for r, c, value in present:
+                puzzle[r][c] = value
+            if still_unique:
+                raise AssertionError("legacy generator rot180 orbit-minimality invariant failed")
+    else:
+        # Preserve the historical strict single-clue minimality contract for
+        # ``none`` and ``mix``.
+        changed = True
+        while changed:
+            changed = False
+            filled = [(r, c) for r in range(9) for c in range(9) if puzzle[r][c] != 0]
+            rng.shuffle(filled)
+            for r, c in filled:
+                backup = puzzle[r][c]
+                puzzle[r][c] = 0
+                if unique(puzzle):
+                    changed = True
+                else:
+                    puzzle[r][c] = backup
 
     return puzzle, full
 
