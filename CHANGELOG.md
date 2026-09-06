@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## [1.1.0] - 2026-09-06
+
+### Human logic
+
+- Promoted the persistent candidate engine into public `LogicalState` / `logical_solve()` APIs.
+- Added versioned human difficulty scoring through `human_rate()` and `HumanRating`.
+- Kept `explain()` backward-compatible while routing it through the reusable logical state engine.
+
+### Smart generation
+
+- Added `GenerationResult` metadata with solution, givens, symmetry/minimality mode, machine difficulty, and human difficulty.
+- Added deterministic `generate_rated()` for bounded human-difficulty-targeted generation.
+- Existing `generate()` behavior and uniqueness/minimality/symmetry contracts remain unchanged.
+
+### Performance and reliability
+
+- Replaced the unbounded machine-rating dictionary with a bounded 4096-entry LRU cache.
+- `analyze()` now canonicalizes once and reuses that representation for machine difficulty.
+- Added v1.1 integration/regression coverage for persistent logic, deterministic human rating, generation metadata, bounded cache behavior, and rated-generation retry semantics.
+
 ## [1.0.1] - 2026-09-06
 
 ### Fixes
@@ -28,21 +48,15 @@ All notable changes to this project are documented here.
 - Replaced repeated partial solves used to construct a full grid with direct Sudoku-preserving permutations of a valid complete grid.
 - Made `mix` distinct from `rot180`: it attempts rotational removals first and then permits single-cell cleanup.
 - `minimal=True` with `none` or `mix` enforces strict single-clue minimality.
-- `minimal=True, symmetry="rot180"` preserves exact rotational clue-pattern symmetry and enforces orbit-minimality (no full rotational clue orbit can be removed while retaining uniqueness).
+- `minimal=True, symmetry="rot180"` preserves exact rotational clue-pattern symmetry and enforces orbit-minimality.
 - Added explicit validation for generator options and final uniqueness/symmetry invariants.
 
 ### Validation and performance discipline
 
 - Added v1 invariant tests for retained solutions, prepass equivalence, canonical idempotence, malformed input, deterministic generation, and concurrent public solver calls.
-- Added a checked-in deterministic regression corpus and search-work signature covering solution count, solution, nodes, branches, failed branches, and depth.
+- Added a checked-in deterministic regression corpus and search-work signature.
 - Wall-clock benchmark measurements remain informational; shared-runner timing is not used as a flaky CI threshold.
 - Expanded CI across CPython 3.10–3.14, Windows/macOS smoke tests, strict docs, distribution build checks, and clean wheel installation.
-
-### Release metadata
-
-- Promoted the package to `1.0.0` and production/stable metadata.
-- Repaired `CITATION.cff` repository, author, version, and release metadata.
-- Refreshed documentation to separate measured guarantees from unsupported performance superlatives.
 
 ## [0.2.0] - 2025-10-05
 

@@ -17,7 +17,16 @@ from .canonical import canonical_form
 from .crosscheck import cnf_dimacs_lines, sat_solve
 from .explain import explain
 from .formats import detect_format, read_grids, write_grids
-from .generate import generate
+from .generate import GenerationResult, generate, generate_rated, generate_result
+from .logic import (
+    HUMAN_DIFFICULTY_VERSION,
+    HumanDifficulty,
+    HumanRating,
+    LogicalResult,
+    LogicalState,
+    human_rate,
+    logical_solve,
+)
 from .rating import DIFFICULTY_VERSION, rate
 from .solver import (
     SOLVER,
@@ -45,16 +54,25 @@ __all__ = [
     "analyze",
     "count_solutions",
     "explain",
+    "logical_solve",
+    "LogicalState",
+    "LogicalResult",
+    "human_rate",
+    "HumanRating",
+    "HumanDifficulty",
+    "HUMAN_DIFFICULTY_VERSION",
     "rate",
     "DIFFICULTY_VERSION",
     "canonical_form",
     "generate",
+    "generate_result",
+    "generate_rated",
+    "GenerationResult",
     "sat_solve",
     "cnf_dimacs_lines",
     "read_grids",
     "write_grids",
     "detect_format",
-    # Compatibility exports retained for existing 0.x users.
     "SOLVER",
     "generate_minimal",
     "is_minimal",
@@ -67,4 +85,4 @@ __all__ = [
     "legacy_to_string",
 ]
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"

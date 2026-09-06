@@ -2,11 +2,19 @@
 
 For the complete release history, see the repository-level `CHANGELOG.md`.
 
+## 1.1.0 — 2026-09-06
+
+- Public persistent `LogicalState` / `logical_solve()` human-solving API.
+- Separate deterministic human difficulty v1 with `easy` / `medium` / `hard` / `expert` bands.
+- Difficulty-targeted generation and rich `GenerationResult` metadata.
+- Bounded machine-rating cache and canonicalization reuse in `analyze()`.
+- New v1.1 logical/generation integration regression coverage.
+
 ## 1.0.1 — 2026-09-06
 
-- Human explanations now preserve candidate eliminations across logical steps.
+- Human explanations preserve candidate eliminations across logical steps.
 - Placements refresh legal candidates without resurrecting prior eliminations.
-- Added contradiction guards and regression coverage for elimination-to-placement progress.
+- Contradiction guards and elimination-to-placement regression coverage.
 
 ## 1.0.0 — 2026-09-06
 

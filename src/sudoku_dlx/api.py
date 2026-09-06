@@ -54,8 +54,6 @@ def from_string(s: str) -> Grid:
         elif ch in "123456789":
             out[r][c] = int(ch)
         elif ch.isdigit():
-            # Preserve the 0.x diagnostic contract for non-ASCII numeric
-            # characters while accepting only ASCII Sudoku digits.
             raise ValueError("digits must be 1..9")
         else:
             raise ValueError(f"bad char at {i}: {ch!r}")
@@ -166,8 +164,8 @@ def analyze(grid: Grid) -> Dict[str, Any]:
     """
     Return a compact analysis dictionary.
 
-    Malformed (non-9x9 / out-of-range) grids are reported as invalid rather than
-    raising from downstream canonicalization or rating code.
+    v1.1 canonicalizes once and reuses that representative for machine
+    difficulty scoring, avoiding redundant canonicalization work.
     """
 
     if not is_well_formed(grid):
@@ -184,10 +182,11 @@ def analyze(grid: Grid) -> Dict[str, Any]:
         }
 
     from .canonical import canonical_form
-    from .rating import rate
+    from .rating import _rate_canonical
 
     givens = sum(1 for r in range(9) for c in range(9) if grid[r][c] != 0)
     valid = is_valid(grid)
+    canonical = canonical_form(grid)
     unique = False
     solved: Optional[SolveResult] = None
     if valid:
@@ -202,14 +201,15 @@ def analyze(grid: Grid) -> Dict[str, Any]:
         nodes = int(solved.stats.nodes)
         backs = int(solved.stats.backtracks)
 
+    difficulty = _rate_canonical(canonical) if valid else 10.0
     return {
         "version": ANALYZE_VERSION,
         "valid": valid,
         "givens": givens,
         "solvable": solved is not None,
         "unique": unique,
-        "difficulty": float(rate(grid)),
-        "canonical": canonical_form(grid),
+        "difficulty": float(difficulty),
+        "canonical": canonical,
         "solution": solution,
         "stats": {"ms": ms, "nodes": nodes, "backtracks": backs},
     }
