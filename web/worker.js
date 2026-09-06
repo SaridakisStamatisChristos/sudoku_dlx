@@ -1,189 +1,217 @@
 const PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v0.26.1/full/";
 let pyodideReadyPromise = null;
 
-async function loadPyodideOnce() {
-  if (pyodideReadyPromise) {
-    return pyodideReadyPromise;
-  }
-  self.postMessage({ type: 'status', message: 'Downloading Pyodide runtime...' });
-  importScripts(`${PYODIDE_INDEX_URL}pyodide.js`);
+function status(message) {
+  self.postMessage({ type: "status", message });
+}
+
+async function loadRuntimeOnce() {
+  if (pyodideReadyPromise) return pyodideReadyPromise;
+
   pyodideReadyPromise = (async () => {
+    status("Downloading Python runtime…");
+    importScripts(`${PYODIDE_INDEX_URL}pyodide.js`);
     const py = await loadPyodide({ indexURL: PYODIDE_INDEX_URL });
-    self.postMessage({ type: 'status', message: 'Initializing solver...' });
+
+    status("Loading sudoku_dlx package…");
+    await py.loadPackage("micropip");
+
+    const manifestUrl = new URL("./assets/wheel.json", self.location.href);
+    const manifestResponse = await fetch(manifestUrl, { cache: "no-store" });
+    if (!manifestResponse.ok) {
+      throw new Error(`wheel manifest request failed: ${manifestResponse.status}`);
+    }
+    const manifest = await manifestResponse.json();
+    if (!manifest.filename || !manifest.version) {
+      throw new Error("wheel manifest is incomplete");
+    }
+
+    const wheelUrl = new URL(`./assets/${manifest.filename}`, self.location.href).href;
+    py.globals.set("web_wheel_url", wheelUrl);
     await py.runPythonAsync(`
-from typing import List, Tuple
+import micropip
+await micropip.install(web_wheel_url)
+`);
+    py.globals.delete("web_wheel_url");
 
-def col_cell(r, c): return r*9 + c
+    await py.runPythonAsync(`
+from dataclasses import asdict
+import json
+import sudoku_dlx as sdk
 
-def col_row(r, v):  return 81  + r*9 + (v-1)
 
-def col_col(c, v):  return 162 + c*9 + (v-1)
+def _web_grid(values):
+    vals = [int(v) for v in values]
+    if len(vals) != 81:
+        raise ValueError("expected 81 cells")
+    if any(v < 0 or v > 9 for v in vals):
+        raise ValueError("cells must be integers in 0..9")
+    return [vals[r * 9:(r + 1) * 9] for r in range(9)]
 
-def col_box(b, v):  return 243 + b*9 + (v-1)
 
-def box_of(r, c):   return (r//3)*3 + (c//3)
+def _grid_string(grid):
+    return sdk.to_string(grid)
 
-ROW_COLS: List[List[int]] = []
-ROW_PAYLOAD: List[Tuple[int,int,int]] = []
-COL_ROWS_BITS: List[int] = [0]*324
-RCV_TO_ROWIDX: dict[Tuple[int,int,int], int] = {}
 
-def _precompute_matrix():
-    idx = 0
-    for r in range(9):
-        for c in range(9):
-            b = box_of(r, c)
-            for v in range(1,10):
-                cols = [col_cell(r,c), col_row(r,v), col_col(c,v), col_box(b,v)]
-                ROW_COLS.append(cols)
-                ROW_PAYLOAD.append((r,c,v))
-                RCV_TO_ROWIDX[(r,c,v)] = idx
-                mask = 1 << idx
-                for col in cols: COL_ROWS_BITS[col] |= mask
-                idx += 1
+def _json(payload):
+    return json.dumps(payload, separators=(",", ":"))
 
-_precompute_matrix()
-ALL_ROWS_MASK = (1 << 729) - 1
-ALL_COLS_MASK = (1 << 324) - 1
 
-def iter_set_bits(x:int):
-    while x:
-        lsb = x & -x
-        i = (lsb.bit_length()-1)
-        yield i
-        x ^= lsb
+def web_solve(values):
+    grid = _web_grid(values)
+    if not sdk.is_valid(grid):
+        return _json({"ok": False, "reason": "invalid"})
+    solved = sdk.solve(grid)
+    if solved is None:
+        return _json({"ok": False, "reason": "unsatisfiable"})
+    solutions = sdk.count_solutions(grid, limit=2)
+    return _json({
+        "ok": True,
+        "grid": solved.grid,
+        "solution": _grid_string(solved.grid),
+        "solutions": solutions,
+        "stats": asdict(solved.stats),
+    })
 
-def is_bit_set(x:int,i:int)->bool: return (x>>i)&1
 
-def clear_bit(x:int,i:int)->int: return x & ~(1<<i)
+def web_analyze(values):
+    grid = _web_grid(values)
+    analysis = sdk.analyze(grid)
+    human = sdk.human_rate(grid)
+    analysis["human"] = asdict(human)
+    analysis["package_version"] = sdk.__version__
+    analysis["machine_version"] = sdk.DIFFICULTY_VERSION
+    analysis["human_version"] = sdk.HUMAN_DIFFICULTY_VERSION
+    return _json(analysis)
 
-class BitDLX:
-    def _choose_col(self, rows_mask:int, cols_mask:int):
-        best_col=None; best_sz=10**9
-        for c in range(324):
-            if not is_bit_set(cols_mask,c): continue
-            cand = COL_ROWS_BITS[c] & rows_mask
-            sz = cand.bit_count()
-            if sz==0: return c
-            if sz<best_sz: best_sz=sz; best_col=c
-            if sz<=1: break
-        return best_col
 
-    def _cover_row(self, rows_mask:int, cols_mask:int, row_idx:int):
-        cols = ROW_COLS[row_idx]
-        union_rows=0
-        for c in cols: union_rows |= (COL_ROWS_BITS[c] & rows_mask)
-        rows_mask2 = rows_mask & ~union_rows
-        for c in cols: cols_mask = clear_bit(cols_mask, c)
-        return rows_mask2, cols_mask
+def web_logic(values, max_steps=500):
+    grid = _web_grid(values)
+    if not sdk.is_valid(grid):
+        return _json({"ok": False, "reason": "invalid"})
+    result = sdk.logical_solve(grid, max_steps=int(max_steps))
+    rating = sdk.human_rate(grid, max_steps=int(max_steps))
+    return _json({
+        "ok": True,
+        "grid": result.grid,
+        "steps": result.steps,
+        "solved": result.solved,
+        "stalled": result.stalled,
+        "contradiction": result.contradiction,
+        "limit_reached": result.limit_reached,
+        "hardest_strategy": result.hardest_strategy,
+        "rating": asdict(rating),
+    })
 
-    def _search(self, rows_mask:int, cols_mask:int, limit:int, keep_one:bool, collect_sol:list, found:list, stack:list):
-        if cols_mask==0:
-            found[0]+=1
-            if keep_one and not collect_sol:
-                collect_sol.extend(stack)
-            return found[0]>=limit
-        c = self._choose_col(rows_mask, cols_mask)
-        cand = COL_ROWS_BITS[c] & rows_mask
-        if cand==0: return False
-        for r in iter_set_bits(cand):
-            rows2, cols2 = self._cover_row(rows_mask, cols_mask, r)
-            stack.append(r)
-            if self._search(rows2, cols2, limit, keep_one, collect_sol, found, stack): return True
-            stack.pop()
-        return False
 
-    def count_solutions(self, clues:list[tuple[int,int,int]], limit:int=2):
-        rows_mask = ALL_ROWS_MASK; cols_mask = ALL_COLS_MASK
-        for (r,c,v) in clues:
-            row_idx = RCV_TO_ROWIDX.get((r,c,v))
-            if row_idx is None or not is_bit_set(rows_mask, row_idx): return 0, None
-            rows_mask, cols_mask = self._cover_row(rows_mask, cols_mask, row_idx)
-        found=[0]; collect=[]
-        self._search(rows_mask, cols_mask, limit, True, collect, found, [])
-        if found[0]==0: return 0, None
-        grid=[[0]*9 for _ in range(9)]
-        for (rr,cc,vv) in clues: grid[rr][cc]=vv
-        for rid in collect:
-            rr,cc,vv = ROW_PAYLOAD[rid]; grid[rr][cc]=vv
-        return found[0], grid
+def web_generate(seed, difficulty, symmetry):
+    parsed_seed = None if seed is None or str(seed).strip() == "" else int(seed)
+    symmetry = str(symmetry or "mix")
+    difficulty = str(difficulty or "any")
+    if difficulty == "any":
+        result = sdk.generate_result(
+            seed=parsed_seed,
+            target_givens=30,
+            symmetry=symmetry,
+        )
+    else:
+        result = sdk.generate_rated(
+            difficulty,
+            seed=parsed_seed,
+            symmetry=symmetry,
+            max_attempts=64,
+        )
+    return _json({
+        "ok": True,
+        "grid": result.grid,
+        "solution": result.solution,
+        "seed": result.seed,
+        "attempts": result.attempts,
+        "givens": result.givens,
+        "symmetry": result.symmetry,
+        "minimality": result.minimality,
+        "machine_difficulty": result.machine_difficulty,
+        "human_difficulty": asdict(result.human_difficulty),
+    })
+`);
 
-SOLVER = BitDLX()
-
-def parse_linear(vals):
-    g=[[0]*9 for _ in range(9)]
-    for i,v in enumerate(vals):
-        r,c=divmod(i,9); g[r][c]=int(v)
-    return g
-
-def clues_from_grid(g):
-    return [(r,c,g[r][c]) for r in range(9) for c in range(9) if g[r][c]!=0]
-    `);
-    self.postMessage({ type: 'status', message: 'Pyodide ready. Enter digits and press Solve.' });
+    const runtimeVersion = py.runPython("sdk.__version__");
+    status(`sudoku_dlx v${runtimeVersion} ready in your browser.`);
     return py;
   })();
+
   try {
     return await pyodideReadyPromise;
-  } catch (err) {
+  } catch (error) {
     pyodideReadyPromise = null;
-    throw err;
+    throw error;
+  }
+}
+
+function parsePythonJson(raw) {
+  const text = typeof raw === "string" ? raw : raw.toString();
+  if (raw && typeof raw.destroy === "function") raw.destroy();
+  return JSON.parse(text);
+}
+
+async function callPython(functionName, args) {
+  const py = await loadRuntimeOnce();
+  const names = [];
+  try {
+    args.forEach((value, index) => {
+      const name = `web_arg_${index}`;
+      names.push(name);
+      py.globals.set(name, value);
+    });
+    const expression = `${functionName}(${names.join(",")})`;
+    return parsePythonJson(py.runPython(expression));
+  } finally {
+    names.forEach((name) => py.globals.delete(name));
   }
 }
 
 self.onmessage = async (event) => {
-  const { type } = event.data || {};
-  if (type === 'init') {
+  const { type, requestId } = event.data || {};
+  if (type === "init") {
     try {
-      await loadPyodideOnce();
-    } catch (err) {
-      self.postMessage({ type: 'error', message: 'Failed to initialize Pyodide.', detail: `${err}` });
+      await loadRuntimeOnce();
+      self.postMessage({ type: "ready" });
+    } catch (error) {
+      self.postMessage({
+        type: "error",
+        requestId,
+        message: "Failed to initialize the browser runtime.",
+        detail: String(error),
+      });
     }
     return;
   }
-  if (type === 'solve') {
-    const { values } = event.data;
-    const started = performance.now();
-    let py;
-    try {
-      py = await loadPyodideOnce();
-    } catch (err) {
-      self.postMessage({ type: 'error', message: 'Pyodide is not available.', detail: `${err}` });
+
+  try {
+    let payload;
+    if (type === "solve") {
+      payload = await callPython("web_solve", [event.data.values]);
+    } else if (type === "analyze") {
+      payload = await callPython("web_analyze", [event.data.values]);
+    } else if (type === "logic") {
+      payload = await callPython("web_logic", [event.data.values, 500]);
+    } else if (type === "generate") {
+      payload = await callPython("web_generate", [
+        event.data.seed ?? "",
+        event.data.difficulty ?? "any",
+        event.data.symmetry ?? "mix",
+      ]);
+    } else {
       return;
     }
-    try {
-      py.globals.set('vals', values);
-      const out = py.runPython(`
-g = parse_linear(vals)
-cnt, sol = SOLVER.count_solutions(clues_from_grid(g), limit=2)
-cnt, sol
-`);
-      const cnt = out.get(0);
-      const sol = out.get(1);
-      let flat = null;
-      if (typeof cnt === 'number' && cnt > 0 && sol !== undefined && sol !== null) {
-        const js = sol.toJs({ create_proxies: false });
-        flat = [];
-        for (let r = 0; r < 9; r++) {
-          for (let c = 0; c < 9; c++) {
-            flat.push(js[r][c]);
-          }
-        }
-      }
-      if (typeof cnt === 'number' && cnt > 0 && Array.isArray(flat)) {
-        const elapsed = performance.now() - started;
-        self.postMessage({ type: 'result', status: 'ok', solutions: cnt, grid: flat, ms: elapsed });
-      } else if (typeof cnt === 'number' && cnt === 0) {
-        self.postMessage({ type: 'result', status: 'none' });
-      } else {
-        self.postMessage({ type: 'error', message: 'Unexpected solver output.' });
-      }
-      if (sol && typeof sol.destroy === 'function') {
-        sol.destroy();
-      }
-      out.destroy();
-    } catch (err) {
-      self.postMessage({ type: 'error', message: 'Solver execution failed.', detail: `${err}` });
-    }
-    return;
+    self.postMessage({ type: "result", action: type, requestId, payload });
+  } catch (error) {
+    self.postMessage({
+      type: "error",
+      action: type,
+      requestId,
+      message: "Operation failed.",
+      detail: String(error),
+    });
   }
 };
