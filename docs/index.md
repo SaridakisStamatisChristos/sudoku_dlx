@@ -1,46 +1,66 @@
 # Sudoku DLX
 
-Fast **Sudoku** solver & generator using **Algorithm X / Dancing Links** with **Python bitsets**.  
-Includes **unique/minimal** generation, **difficulty v2**, **canonicalization**, **explainable steps**, batch tools, and a JS demo.
+A deterministic Sudoku exact-cover toolkit using **Algorithm X-style minimum-column search with Python integer bitsets**. The core represents 729 candidate assignments against 324 Sudoku constraints; it does not use pointer-linked Dancing Links nodes.
 
-**Repo:** [:octicons-mark-github-16: GitHub](https://github.com/SaridakisStamatisChristos/sudoku_dlx) · **Docs:** this site · **Demo:** GitHub Pages `web/` and `visualizer.html`.
+The package includes solving and bounded solution counting, unique puzzle generation, difficulty v3, Sudoku-isomorphism canonicalization, human-style explanation, dataset tooling, SAT cross-checking, and a Pyodide browser demo.
 
-## Features
-- Bitset DLX solver with stats (nodes, backtracks)
-- Unique/minimal generator with symmetry controls
-- Deterministic **difficulty v2** ([0,10])
-- Canonical form & dataset de-duplication
-- Human strategies: singles, pairs, triples, **X-Wing**, **Swordfish**, **Simple Coloring**
-- CLI for solve/rate/gen/canon/explain/batch
+**Repo:** [:octicons-mark-github-16: GitHub](https://github.com/SaridakisStamatisChristos/sudoku_dlx) · **Demo:** [GitHub Pages](https://saridakisstamatischristos.github.io/sudoku_dlx/) · **v1 audit:** [hardening notes](V1_HARDENING.md)
 
-## Install
-```bash
-python -m pip install sudoku_dlx  # (after PyPI publish)
-```
-For development:
+## v1.0 guarantees
+
+- Reentrant package-level solve/count APIs with deterministic nodes, branches, failed branches/backtracks, and maximum depth.
+- Unique generation with deterministic seeds and explicit `none`, `rot180`, and `mix` removal semantics.
+- Strict single-clue minimality for `minimal=True` with `none`/`mix`; symmetry-preserving orbit-minimality for `minimal=True, symmetry="rot180"`.
+- Row-major, valid, idempotent canonical representatives for supported Sudoku isomorphs.
+- Deterministic difficulty v3 based on canonicalized search work rather than wall-clock timing.
+- Independent optional SAT solving/CNF export.
+- Fixed-corpus search-work regression checks plus property-based/nightly validation.
+
+## Install for development
+
 ```bash
 git clone https://github.com/SaridakisStamatisChristos/sudoku_dlx
 cd sudoku_dlx
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+python -m venv .venv
+source .venv/bin/activate  # Windows: .\.venv\Scripts\activate
+python -m pip install -e ".[dev]"
+pytest -q
 ```
+
 Optional SAT cross-check:
+
 ```bash
-pip install -e ".[sat]"
+python -m pip install -e ".[sat]"
 ```
 
 ## Hello Sudoku
+
 ```python
-from sudoku_dlx import from_string, solve, to_string, explain
-g = from_string("53..7....6..195... ...")  # 81 chars; dots for blanks
-res = solve(g)
-print(to_string(res.grid))
-steps = explain(g, max_steps=200)
-print(steps["steps"][:3])  # preview moves
+from sudoku_dlx import from_string, solve, to_string
+
+puzzle = from_string(
+    "53..7...."
+    "6..195..."
+    ".98....6."
+    "8...6...3"
+    "4..8.3..1"
+    "7...2...6"
+    ".6....28."
+    "...419..5"
+    "....8..79"
+)
+result = solve(puzzle)
+assert result is not None
+print(to_string(result.grid))
+print(result.stats)
 ```
 
-## Links
-- CLI Guide: [CLI reference](cli.md)
-- API Reference: [Python API](api.md)
-- Strategies: [Human strategies](strategies.md)
-- Batch: [Datasets & tooling](batch.md)
+## Documentation
+
+- [Quickstart](quickstart.md)
+- [CLI reference](cli.md)
+- [Python API](api.md)
+- [Human strategies](strategies.md)
+- [Datasets & batch tooling](batch.md)
+- [v1.0 hardening audit](V1_HARDENING.md)
+- [Changelog highlights](changelog.md)

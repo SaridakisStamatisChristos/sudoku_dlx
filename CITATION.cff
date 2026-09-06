@@ -1,9 +1,12 @@
 cff-version: 1.2.0
-message: If you use this software, please cite it as below.
-title: sudoku-dlx-bitset
+message: "If you use this software, please cite it as below."
+title: "sudoku_dlx: deterministic bitset exact-cover Sudoku toolkit"
+type: software
 authors:
-Saridakis Stamatis-Christos
-date-released: 2025-09-27
-repository-code: https://github.com/SaridakisStamatisChristos/sudoku-dlx-bitset
+  - family-names: Saridakis
+    given-names: Stamatis-Christos
+repository-code: "https://github.com/SaridakisStamatisChristos/sudoku_dlx"
+url: "https://saridakisstamatischristos.github.io/sudoku_dlx/"
 license: MIT
-version: 0.1.0
+version: 1.0.0
+date-released: 2026-09-06

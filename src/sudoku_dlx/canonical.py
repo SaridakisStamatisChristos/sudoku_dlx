@@ -1,52 +1,52 @@
 from __future__ import annotations
-"""
-State-of-the-art canonicalization for Sudoku puzzles.
 
-Maps isomorphic puzzles to a single 81-char canonical form using:
-  • Dihedral symmetries D4 (8 transforms)
-  • Band (row bands) and stack (column stacks) permutations (3! each)
-  • Row swaps within each band and column swaps within each stack (3! for each band/stack)
-  • Greedy digit relabeling (first-appearance maps to 1..9)
-
-Total variants explored per grid: 8 × (3!)^4 = 10,368 — acceptable for CLI/tests.
 """
+Canonical representatives for Sudoku puzzle isomorphism classes.
+
+The search covers the standard structure-preserving transformations used here:
+D4 board symmetries, band/stack permutations, row permutations within bands,
+column permutations within stacks, and digit relabeling.
+
+The search key is serialized in block-major order because that supports strong
+prefix pruning. The public result is converted back to ordinary row-major
+Sudoku order before it is returned. This distinction is important: older
+versions returned the internal block-major key directly, so parsing the
+"canonical" string as a normal grid could change the puzzle and make repeated
+canonicalization cycle.
+"""
+
 from itertools import permutations
 from typing import List, Sequence, Tuple
 
-from .api import Grid
+from .api import Grid, is_well_formed
 
-# --------- Dihedral transforms over 9x9 grids (D4) ----------
 
 def _rot90(g: Grid) -> Grid:
-    return [[g[9 - 1 - c][r] for c in range(9)] for r in range(9)]
+    return [[g[8 - c][r] for c in range(9)] for r in range(9)]
 
 
 def _rot180(g: Grid) -> Grid:
-    return [[g[9 - 1 - r][9 - 1 - c] for c in range(9)] for r in range(9)]
+    return [[g[8 - r][8 - c] for c in range(9)] for r in range(9)]
 
 
 def _rot270(g: Grid) -> Grid:
-    return [[g[c][9 - 1 - r] for c in range(9)] for r in range(9)]
+    return [[g[c][8 - r] for c in range(9)] for r in range(9)]
 
 
 def _flip_h(g: Grid) -> Grid:
-    # horizontal flip (mirror over vertical axis)
-    return [[g[r][9 - 1 - c] for c in range(9)] for r in range(9)]
+    return [[g[r][8 - c] for c in range(9)] for r in range(9)]
 
 
 def _flip_v(g: Grid) -> Grid:
-    # vertical flip (mirror over horizontal axis)
-    return [g[9 - 1 - r][:] for r in range(9)]
+    return [g[8 - r][:] for r in range(9)]
 
 
 def _flip_main_diag(g: Grid) -> Grid:
-    # transpose over main diagonal
     return [[g[c][r] for c in range(9)] for r in range(9)]
 
 
 def _flip_anti_diag(g: Grid) -> Grid:
-    # reflect over anti-diagonal (r,c) -> (8-c,8-r)
-    return [[g[9 - 1 - c][9 - 1 - r] for c in range(9)] for r in range(9)]
+    return [[g[8 - c][8 - r] for c in range(9)] for r in range(9)]
 
 
 _TRANSFORMS = (
@@ -60,26 +60,44 @@ _TRANSFORMS = (
     _flip_anti_diag,
 )
 
-# --------- Permutations for bands/stacks and inner rows/cols ----------
-
-_PERM3 = list(permutations((0, 1, 2)))  # 6 perms
+_PERM3 = list(permutations((0, 1, 2)))
 
 
 def _cell_char(value: int) -> str:
-    if value == 0:
-        return "."
-    if isinstance(value, str):
-        return value if value not in {"0", "-"} else "."
-    return str(value)
+    return "." if value == 0 else str(value)
+
+
+def _block_major_to_row_major(chars: Sequence[str]) -> str:
+    """Convert the 9 contiguous 3x3 blocks used by the search to row-major order."""
+
+    if len(chars) != 81:
+        raise ValueError("canonical candidate must contain exactly 81 cells")
+    out = [""] * 81
+    for block_row in range(3):
+        for block_col in range(3):
+            block_start = (block_row * 3 + block_col) * 9
+            for local_row in range(3):
+                for local_col in range(3):
+                    src = block_start + local_row * 3 + local_col
+                    dst = (block_row * 3 + local_row) * 9 + block_col * 3 + local_col
+                    out[dst] = chars[src]
+    return "".join(out)
 
 
 def _canonical_band_stack(
     grid_chars: Sequence[Sequence[str]],
     band_perm: Tuple[int, int, int],
     stack_perm: Tuple[int, int, int],
-    best: str | None,
-) -> str | None:
-    best_local = best
+    best_key: str | None,
+    best_repr: str | None,
+) -> tuple[str | None, str | None]:
+    """
+    Search inner row/column permutations for one band/stack ordering.
+
+    ``best_key`` is block-major and exists only to make lexicographic prefix
+    pruning cheap. ``best_repr`` is the corresponding normal row-major grid.
+    """
+
     chosen_row_perms: dict[int, Tuple[int, int, int]] = {}
     chosen_col_perms: dict[int, Tuple[int, int, int]] = {}
     mapping: dict[str, str] = {}
@@ -96,11 +114,13 @@ def _canonical_band_stack(
             mapping.pop(key, None)
 
     def dfs(block_idx: int) -> None:
-        nonlocal best_local, next_digit, cmp_state
+        nonlocal best_key, best_repr, next_digit, cmp_state
+
         if block_idx == 9:
-            candidate = "".join(out_chars)
-            if best_local is None or candidate < best_local:
-                best_local = candidate
+            key = "".join(out_chars)
+            if best_key is None or key < best_key:
+                best_key = key
+                best_repr = _block_major_to_row_major(key)
             return
 
         band_idx = block_idx // 3
@@ -108,22 +128,15 @@ def _canonical_band_stack(
         band = band_perm[band_idx]
         stack = stack_perm[stack_idx]
 
-        row_options = (
-            (chosen_row_perms[band],)
-            if band in chosen_row_perms
-            else _PERM3
-        )
-        col_options = (
-            (chosen_col_perms[stack],)
-            if stack in chosen_col_perms
-            else _PERM3
-        )
+        row_options = (chosen_row_perms[band],) if band in chosen_row_perms else _PERM3
+        col_options = (chosen_col_perms[stack],) if stack in chosen_col_perms else _PERM3
 
         for row_perm in row_options:
             assigned_row = False
             if band not in chosen_row_perms:
                 chosen_row_perms[band] = row_perm
                 assigned_row = True
+
             for col_perm in col_options:
                 assigned_col = False
                 if stack not in chosen_col_perms:
@@ -136,10 +149,10 @@ def _canonical_band_stack(
                 inserted: List[str] = []
                 pruned = False
 
-                for r_local in row_perm:
-                    row = grid_chars[band * 3 + r_local]
-                    for c_local in col_perm:
-                        ch = row[stack * 3 + c_local]
+                for local_row in row_perm:
+                    row = grid_chars[band * 3 + local_row]
+                    for local_col in col_perm:
+                        ch = row[stack * 3 + local_col]
                         if ch == ".":
                             mapped = "."
                         else:
@@ -150,9 +163,10 @@ def _canonical_band_stack(
                                 inserted.append(ch)
                                 if next_digit < ord("9"):
                                     next_digit += 1
+
                         out_chars.append(mapped)
-                        if best_local is not None and cmp_state == 0:
-                            best_char = best_local[len(out_chars) - 1]
+                        if best_key is not None and cmp_state == 0:
+                            best_char = best_key[len(out_chars) - 1]
                             if mapped > best_char:
                                 pruned = True
                                 break
@@ -169,40 +183,43 @@ def _canonical_band_stack(
                 if assigned_col:
                     chosen_col_perms.pop(stack, None)
 
-                if pruned and best_local is not None and cmp_state == 0:
-                    # If pruning occurred due to mapped > best prefix, remaining column perms
-                    # in this branch are unlikely to improve; continue to next col perm.
-                    pass
-
             if assigned_row:
                 chosen_row_perms.pop(band, None)
 
     dfs(0)
-    return best_local
-
-
-# --------- Public API (full canon) ----------
+    return best_key, best_repr
 
 
 def canonical_form(grid: Grid) -> str:
     """
-    Return the lexicographically smallest normalized string among all:
-      - D4 dihedral transforms
-      - Band and stack permutations
-      - Row swaps within each band, column swaps within each stack
-    Each candidate is normalized by greedy digit relabeling before compare.
+    Return a stable row-major representative for the puzzle's isomorphism class.
+
+    The theoretical transformation space is 8 × (3!)^8. Prefix pruning avoids
+    materializing that space in normal use. Digit labels are normalized by first
+    appearance in the internal canonical search order.
     """
-    best: str | None = None
-    for tf in _TRANSFORMS:
-        g1 = tf(grid)
-        grid_chars = [[_cell_char(cell) for cell in row] for row in g1]
+
+    if not is_well_formed(grid):
+        raise ValueError("grid must be a 9x9 list of integers in 0..9")
+
+    best_key: str | None = None
+    best_repr: str | None = None
+
+    for transform in _TRANSFORMS:
+        transformed = transform(grid)
+        grid_chars = [[_cell_char(cell) for cell in row] for row in transformed]
         for band_perm in _PERM3:
             for stack_perm in _PERM3:
-                cand = _canonical_band_stack(grid_chars, band_perm, stack_perm, best)
-                if cand is not None and (best is None or cand < best):
-                    best = cand
-    assert best is not None
-    return best
+                best_key, best_repr = _canonical_band_stack(
+                    grid_chars,
+                    band_perm,
+                    stack_perm,
+                    best_key,
+                    best_repr,
+                )
+
+    assert best_repr is not None
+    return best_repr
 
 
 __all__ = ["canonical_form"]
