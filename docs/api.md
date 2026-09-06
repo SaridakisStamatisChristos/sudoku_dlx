@@ -3,77 +3,138 @@
 ```python
 from sudoku_dlx import (
     DIFFICULTY_VERSION,
+    HUMAN_DIFFICULTY_VERSION,
+    GenerationResult,
+    HumanRating,
+    LogicalState,
     analyze,
-    build_reveal_trace,
     canonical_form,
     count_solutions,
     explain,
     from_string,
     generate,
-    is_valid,
-    is_well_formed,
+    generate_rated,
+    generate_result,
+    human_rate,
+    logical_solve,
     rate,
-    sat_solve,
     solve,
     to_string,
 )
 ```
 
-## Parsing and validation
+## Solve and count
 
 ```python
-g = from_string("<81 characters>")  # 1..9; ., 0, -, _ are blanks
-s = to_string(g)                     # row-major 81-char string; dots for blanks
-
-is_well_formed(g)  # exactly 9x9, integer cells in 0..9
-is_valid(g)        # well-formed + no duplicate givens in row/column/box
-```
-
-Malformed grids are rejected deterministically. `solve()` returns `None` for invalid grids and `count_solutions()` returns `0`.
-
-## Solve
-
-```python
-res = solve(g)  # None if invalid or unsatisfiable
-if res is not None:
-    res.grid
-    res.stats.ms
-    res.stats.nodes
-    res.stats.branches
-    res.stats.backtracks
-    res.stats.max_depth
-```
-
-The public solve path creates search state per invocation. Concurrent public callers therefore do not share mutable search statistics.
-
-## Count solutions
-
-```python
+res = solve(g)
 n = count_solutions(g, limit=2)
 ```
 
-`limit` must be an integer ≥ 1. A limit of 2 is sufficient to distinguish unsatisfiable, unique, and non-unique puzzles without enumerating every solution.
+The public exact-cover path remains reentrant and unchanged in v1.1.
 
-## Analyze
+## Machine difficulty
 
 ```python
-report = analyze(g)
-# version, valid, givens, solvable, unique, difficulty,
-# canonical, solution, stats
+print(DIFFICULTY_VERSION)  # "3"
+score = rate(g)            # deterministic float in [0, 10]
 ```
 
-## Generate
+Difficulty v3 uses the canonical representative and exact-cover search-work counters. Its cache is bounded in v1.1, so long-running dataset processes do not grow an unbounded puzzle dictionary.
+
+## Persistent human logic
+
+```python
+state = LogicalState(g)
+move = state.step()
+result = state.run(max_steps=500)
+
+result.grid
+result.steps
+result.solved
+result.stalled
+result.contradiction
+result.hardest_strategy
+```
+
+`LogicalState` owns both the grid and candidate matrix. Candidate eliminations therefore survive across later logical steps, while placements intersect the current candidate state with newly legal candidates.
+
+For a one-shot run:
+
+```python
+result = logical_solve(g, max_steps=500)
+```
+
+The strategy stack includes singles, locked candidates, pairs, triples, X-Wing, Swordfish, and simple coloring.
+
+## Human difficulty
+
+```python
+print(HUMAN_DIFFICULTY_VERSION)  # "1"
+human = human_rate(g)
+
+human.score
+human.label               # easy | medium | hard | expert
+human.solved_logically
+human.steps
+human.placements
+human.eliminations
+human.hardest_strategy
+```
+
+Human difficulty is deliberately separate from machine/search difficulty. It is deterministic and based on the strongest logical strategy reached plus logical workload. A valid puzzle that the built-in logical stack cannot finish is placed in the `expert` band.
+
+## Explain compatibility layer
+
+```python
+exp = explain(g, max_steps=200)
+```
+
+`explain()` keeps its existing `explain-1` dictionary surface while delegating to the persistent logical state engine.
+
+## Generation
+
+Existing behavior is unchanged:
 
 ```python
 p = generate(seed=7331, target_givens=30, minimal=True, symmetry="mix")
 ```
 
-`target_givens` is an approximate lower target. Supported symmetry values are `none`, `rot180`, and `mix`.
+For metadata:
 
-- `minimal=True` with `none` / `mix`: strict single-clue minimality.
-- `minimal=True, symmetry="rot180"`: exact rotational clue-pattern symmetry plus orbit-minimality.
+```python
+meta = generate_result(seed=7331, target_givens=30)
 
-The generator verifies uniqueness before returning.
+meta.grid
+meta.solution
+meta.givens
+meta.machine_difficulty
+meta.human_difficulty
+meta.symmetry
+meta.minimality
+```
+
+For human-difficulty targeting:
+
+```python
+rated = generate_rated(
+    "hard",
+    seed=7331,
+    symmetry="mix",
+    max_attempts=64,
+)
+```
+
+A fixed seed makes the candidate sequence deterministic. If `target_givens` is omitted, v1.1 uses a clue-count prior for the requested band. If no matching candidate is found within `max_attempts`, `generate_rated()` raises `RuntimeError` instead of looping indefinitely.
+
+Generator uniqueness and minimality/symmetry guarantees are unchanged from v1.0.x.
+
+## Analyze
+
+```python
+report = analyze(g)
+```
+
+v1.1 reuses one canonical representation internally for machine rating rather than canonicalizing the same puzzle twice.
 
 ## Canonical form
 
@@ -82,43 +143,4 @@ can = canonical_form(g)
 assert canonical_form(from_string(can)) == can
 ```
 
-The result is an ordinary **row-major** 81-character Sudoku string. Internally, canonical search uses a block-major key for pruning, but that internal ordering is never exposed as the public grid representation.
-
-The canonicalization equivalence set includes D4 transforms, band/stack permutations, row/column permutations within bands/stacks, and digit relabeling.
-
-## Difficulty
-
-```python
-print(DIFFICULTY_VERSION)  # "3"
-score = rate(g)            # float in [0, 10]
-```
-
-Difficulty v3 is deterministic and machine-independent. It rates the canonical representative using clue sparsity and exact-cover search-work counters. Wall-clock time is deliberately excluded.
-
-## Explain human-style steps
-
-```python
-exp = explain(g, max_steps=200)
-exp["steps"]
-exp["progress"]
-exp["solution"]
-```
-
-Strategies include singles, locked candidates, pairs, triples, X-Wing, Swordfish, and simple coloring.
-
-## Reveal trace
-
-```python
-trace = build_reveal_trace(g, res.grid, res.stats)
-# keys: version, kind, initial, solution, steps, stats
-```
-
-The reveal trace is a stable presentation format, not a promise to expose internal cover/uncover operations.
-
-## SAT cross-check (optional)
-
-```python
-sat = sat_solve(g)  # requires the `sat` optional dependency
-```
-
-SAT support provides an independent solving path for validation and interoperability.
+The public canonical value remains an ordinary row-major 81-character string.

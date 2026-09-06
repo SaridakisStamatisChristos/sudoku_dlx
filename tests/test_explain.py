@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from sudoku_dlx import cli, explain, from_string, solve
+from sudoku_dlx import LogicalState, cli, explain, from_string, solve
 
 PUZ = dedent(
     """
@@ -26,7 +26,6 @@ def _apply_steps(grid, steps):
     for st in steps:
         if st["type"] == "place":
             g[st["r"]][st["c"]] = st["v"]
-        # Candidate-only eliminations are intentionally ignored in grid reconstruction.
     return g
 
 
@@ -35,21 +34,20 @@ def test_explain_api_makes_progress_and_is_deterministic():
     out1 = explain(g, max_steps=200)
     out2 = explain(g, max_steps=200)
     assert out1["steps"] == out2["steps"]
-    # steps should not be empty for this classic puzzle
     assert len(out1["steps"]) > 0
-    # applying placements should move towards solution
+
     g2 = _apply_steps(g, out1["steps"])
     res = solve(g)
     res2 = solve(g2)
     assert res is not None and res2 is not None
-    # filled clues after steps should be >= initial
+
     filled0 = sum(1 for r in range(9) for c in range(9) if g[r][c] != 0)
     filled1 = sum(1 for r in range(9) for c in range(9) if g2[r][c] != 0)
     assert filled1 >= filled0
 
 
-def test_explain_persists_candidate_eliminations_between_steps(monkeypatch):
-    explain_module = importlib.import_module("sudoku_dlx.explain")
+def test_logical_state_persists_candidate_eliminations_between_steps(monkeypatch):
+    logic_module = importlib.import_module("sudoku_dlx.logic")
     grid = [[0] * 9 for _ in range(9)]
     elimination_calls = 0
 
@@ -72,26 +70,26 @@ def test_explain_persists_candidate_eliminations_between_steps(monkeypatch):
             "remove": 2,
         }
 
-    monkeypatch.setattr(explain_module, "candidates", fake_candidates)
-    monkeypatch.setattr(explain_module, "_ELIMINATION_STRATEGIES", (fake_elimination,))
-    monkeypatch.setattr(explain_module, "solve", lambda _grid: None)
+    monkeypatch.setattr(logic_module, "candidates", fake_candidates)
+    monkeypatch.setattr(logic_module, "_ELIMINATION_STRATEGIES", (fake_elimination,))
 
-    out = explain_module.explain(grid, max_steps=2)
+    state = LogicalState(grid)
+    result = state.run(max_steps=2)
 
-    assert [step["type"] for step in out["steps"]] == ["eliminate", "place"]
-    assert out["steps"][1]["strategy"] == "naked_single"
-    assert out["progress"][0] == "1"
+    assert [step["type"] for step in result.steps] == ["eliminate", "place"]
+    assert result.steps[1]["strategy"] == "naked_single"
+    assert result.grid[0][0] == 1
     assert elimination_calls == 1
 
 
-def test_stateful_step_rejects_candidate_contradiction(monkeypatch):
-    explain_module = importlib.import_module("sudoku_dlx.explain")
+def test_logical_state_rejects_candidate_contradiction(monkeypatch):
+    logic_module = importlib.import_module("sudoku_dlx.logic")
     grid = [[0] * 9 for _ in range(9)]
-    cand = [[set(range(1, 10)) for _ in range(9)] for _ in range(9)]
-    cand[0][0] = {1}
+    state = LogicalState(grid)
+    state.candidates[0][0] = {1}
 
-    def bad_elimination(_grid, state):
-        state[0][0].remove(1)
+    def bad_elimination(_grid, candidates):
+        candidates[0][0].remove(1)
         return {
             "type": "eliminate",
             "strategy": "bad_test_elimination",
@@ -100,11 +98,11 @@ def test_stateful_step_rejects_candidate_contradiction(monkeypatch):
             "remove": 1,
         }
 
-    monkeypatch.setattr(explain_module, "_PLACEMENT_STRATEGIES", ())
-    monkeypatch.setattr(explain_module, "_ELIMINATION_STRATEGIES", (bad_elimination,))
+    monkeypatch.setattr(logic_module, "_PLACEMENT_STRATEGIES", ())
+    monkeypatch.setattr(logic_module, "_ELIMINATION_STRATEGIES", (bad_elimination,))
 
     with pytest.raises(RuntimeError, match="produced a contradiction"):
-        explain_module._step_once_stateful(grid, cand)
+        state.step()
 
 
 def test_cli_explain_json(capsys):

@@ -115,13 +115,15 @@ def test_analyze_partial_grid_detects_non_unique_solution(monkeypatch):
 
     monkeypatch.setattr("sudoku_dlx.api.count_solutions", fake_count)
     monkeypatch.setattr("sudoku_dlx.api.solve", fake_solve)
-    monkeypatch.setattr("sudoku_dlx.rating.rate", lambda g: 4.0)
+    monkeypatch.setattr("sudoku_dlx.rating.rate_canonical", lambda signature: 4.0)
     monkeypatch.setattr("sudoku_dlx.canonical.canonical_form", lambda g: "K" * 81)
 
     summary = analyze(grid)
     assert summary["valid"] is True
     assert summary["solvable"] is True
     assert summary["unique"] is False
+    assert summary["difficulty"] == 4.0
+    assert summary["canonical"] == "K" * 81
     assert summary["solution"] is not None
     assert len(summary["solution"]) == 81
     assert summary["stats"]["nodes"] >= 0

@@ -1,6 +1,6 @@
 # sudoku_dlx
 
-A deterministic **Sudoku exact-cover toolkit** built around Algorithm X-style search with Python integer bitsets. It solves and counts solutions, generates unique puzzles, canonicalizes Sudoku isomorphs, explains puzzles with human-style strategies, processes datasets, and runs in the browser through Pyodide.
+A deterministic **Sudoku exact-cover and logical-reasoning toolkit** built around Algorithm X-style search with Python integer bitsets. It solves and counts solutions, generates unique puzzles, canonicalizes Sudoku isomorphs, explains puzzles with persistent human-style logic, rates machine and human difficulty separately, processes datasets, and runs in the browser through Pyodide.
 
 The project name retains “DLX” because the model and minimum-column search follow the exact-cover/Dancing Links tradition. The core does **not** use pointer-linked DLX nodes: the 729 candidate rows and 324 constraints are represented as compact Python bitsets with incremental cover operations.
 
@@ -17,10 +17,12 @@ The project name retains “DLX” because the model and minimum-column search f
 
 - **Exact-cover solver:** 729 candidate assignments × 324 Sudoku constraints, minimum-column branching, optional naked-single prepass, first-solution solving, bounded solution counting, and iteration over solutions.
 - **Deterministic work statistics:** nodes, branches, failed branches/backtracks, maximum depth, and wall-clock time at the public API boundary.
+- **Persistent logical solver:** reusable `LogicalState` / `logical_solve()` state with singles, locked candidates, pairs, triples, X-Wing, Swordfish, and simple coloring.
+- **Two difficulty models:** machine Difficulty v3 from canonicalized exact-cover work, plus Human Difficulty v1 from deterministic logical techniques and workload.
 - **Unique puzzle generator:** deterministic seeds, approximate target clue count, strict minimality, rotational symmetry, and mixed removal mode.
+- **Smart generation:** rich `GenerationResult` metadata and bounded `generate_rated()` targeting of `easy`, `medium`, `hard`, or `expert` human difficulty.
 - **Canonicalization:** D4 board transforms, band/stack permutations, row/column permutations inside bands/stacks, and digit relabeling. The returned canonical form is an ordinary **row-major 81-character Sudoku string** and is idempotent.
-- **Difficulty v3:** deterministic `[0, 10]` heuristic derived from the canonical representative and machine-independent search-work features; timing is deliberately excluded.
-- **Human-style explainer:** singles, locked candidates, pairs, triples, X-Wing, Swordfish, and simple coloring.
+- **Human-style explainer:** backward-compatible `explain-1` output routed through the persistent logical state engine.
 - **Independent SAT cross-check:** optional `python-sat` verification and DIMACS CNF export.
 - **Dataset tools:** batch generation, rating, analysis/statistics, format conversion, canonical deduplication, and batch explanation.
 - **Delivery:** typed Python package, CLI, tests/property tests, reproducible regression corpus, MkDocs, GitHub Pages/Pyodide demo, and release workflows.
@@ -52,6 +54,10 @@ from sudoku_dlx import (
     count_solutions,
     from_string,
     generate,
+    generate_rated,
+    generate_result,
+    human_rate,
+    logical_solve,
     rate,
     solve,
     to_string,
@@ -75,18 +81,76 @@ print(to_string(result.grid))
 print(result.stats)  # ms, nodes, backtracks, branches, max_depth
 
 assert count_solutions(puzzle, limit=2) == 1
-print("difficulty:", rate(puzzle))
+print("machine difficulty:", rate(puzzle))
+print("human difficulty:", human_rate(puzzle))
 print("canonical:", canonical_form(puzzle))
+
+logical = logical_solve(puzzle)
+print(logical.solved, logical.hardest_strategy, len(logical.steps))
 
 created = generate(seed=7331, target_givens=30, symmetry="mix")
 assert count_solutions(created, limit=2) == 1
+
+meta = generate_result(seed=7331, target_givens=30)
+print(meta.machine_difficulty, meta.human_difficulty.label)
+
+rated = generate_rated("hard", seed=7331, max_attempts=64)
+print(rated.givens, rated.attempts, rated.human_difficulty)
 ```
 
 Public `solve()` and `count_solutions()` calls own their search state, so concurrent callers do not share mutable solver statistics. The exported legacy `SOLVER` singleton remains for 0.x compatibility; new library code should prefer the public API or instantiate `BitDLX` directly when low-level control is required.
 
+## Persistent human logic
+
+`LogicalState` owns both the grid and the candidate matrix. Eliminations are therefore retained across later steps rather than reconstructed from the unchanged grid.
+
+```python
+from sudoku_dlx import LogicalState
+
+state = LogicalState(puzzle)
+first_move = state.step()
+result = state.run(max_steps=500)
+
+print(result.solved)
+print(result.stalled)
+print(result.hardest_strategy)
+print(result.steps)
+```
+
+Placements intersect the existing candidate matrix with candidates legal under the new grid. This preserves previous logical eliminations while removing candidates invalidated by the placement. Contradictory candidate states are detected explicitly.
+
+The current deterministic strategy stack is:
+
+1. naked single
+2. hidden single
+3. locked candidates / box-line interactions
+4. naked and hidden pairs
+5. X-Wing
+6. naked and hidden triples
+7. Swordfish
+8. simple coloring
+
+The ordering is part of the reproducibility contract for Human Difficulty v1.
+
+## Machine vs human difficulty
+
+The two difficulty scores answer different questions and are intentionally versioned separately.
+
+**Difficulty v3 (`rate`)** is a reproducible engineering heuristic derived from the canonical representative and machine-independent exact-cover search work: clue sparsity, nodes, failed branches, and failure ratio. Wall-clock timing is excluded. Its canonical score cache is bounded to 4096 entries in v1.1.
+
+**Human Difficulty v1 (`human_rate`)** measures the built-in deterministic logical path. It reports:
+
+- score in `[0, 10]`
+- `easy`, `medium`, `hard`, or `expert`
+- whether the built-in logical stack solved the puzzle completely
+- step / placement / elimination counts
+- hardest strategy reached
+
+A valid puzzle that the current human strategy stack cannot finish is classified as `expert`; this means **expert relative to this implementation's strategy set**, not a universal Sudoku tournament standard.
+
 ## Generator semantics
 
-The generator always verifies uniqueness before returning.
+The existing `generate()` API always verifies uniqueness before returning and is unchanged in v1.1.
 
 | Configuration | Guarantee |
 | --- | --- |
@@ -100,12 +164,48 @@ Strict single-clue minimality and exact rotational symmetry are different constr
 
 `target_givens` is an approximate lower target rather than a promise that every seed can reach exactly that clue count while preserving the requested constraints.
 
+## Smart generation in v1.1
+
+`generate_result()` preserves normal generation semantics and adds reproducible metadata:
+
+```python
+meta = generate_result(
+    seed=7331,
+    target_givens=30,
+    minimal=False,
+    symmetry="mix",
+)
+
+meta.grid
+meta.solution
+meta.givens
+meta.symmetry
+meta.minimality
+meta.machine_difficulty
+meta.human_difficulty
+```
+
+`generate_rated()` searches a deterministic, bounded sequence of generated candidates until the requested human difficulty label is reached:
+
+```python
+rated = generate_rated(
+    "medium",
+    seed=7331,
+    symmetry="mix",
+    max_attempts=64,
+)
+```
+
+With a fixed seed, the candidate sequence and result are deterministic. `max_attempts` prevents unbounded generation. If no matching puzzle is found, the function raises `RuntimeError`. The difficulty labels are heuristics tied to Human Difficulty v1, not guarantees about an external publisher's grading system.
+
 ## CLI
+
+The existing CLI remains backward compatible:
 
 ```bash
 sudoku-dlx --help
 
-# Solve / count / inspect
+# Solve / inspect
 sudoku-dlx solve --grid "<81chars>" --pretty --stats
 sudoku-dlx check --grid "<81chars>" --json
 sudoku-dlx rate --grid "<81chars>"
@@ -139,7 +239,7 @@ sudoku-dlx solve --grid "<81chars>" --trace out.json
 
 ## Canonicalization
 
-`canonical_form(grid)` maps supported Sudoku-preserving isomorphs to one stable representative. v1.0 explicitly separates the **internal block-major search key** used for prefix pruning from the **public row-major representation** returned to callers.
+`canonical_form(grid)` maps supported Sudoku-preserving isomorphs to one stable representative. The implementation separates the **internal block-major search key** used for prefix pruning from the **public row-major representation** returned to callers.
 
 Useful invariants covered by tests include:
 
@@ -150,13 +250,13 @@ assert canonical_form(from_string(c)) == c
 
 and equality across D4 transforms, digit relabeling, band/stack permutations, and permitted inner row/column permutations.
 
-## Difficulty rating
+## Analysis efficiency
 
-Difficulty v3 is a reproducible engineering heuristic, not a claim to reproduce a particular newspaper or tournament scale. It combines clue sparsity with canonicalized exact-cover nodes, failed branches, and failure ratio. Timing is excluded so the score does not change merely because the machine or Python build changes.
+`analyze()` reports validity, givens, solvability, uniqueness, machine difficulty, canonical form, solution, and search statistics. In v1.1 it computes the canonical representation once and feeds that same representation into the cached machine-difficulty path instead of canonicalizing the puzzle twice.
 
 ## Correctness and independent validation
 
-The test suite covers ordinary and adversarial solver cases, invalid inputs, uniqueness, generation/minimality, canonicalization invariants, explanation strategies, file/CLI behavior, concurrency/reentrancy, and property-based generation checks. Optional SAT cross-checking supplies an independent solving path.
+The test suite covers ordinary and adversarial solver cases, invalid inputs, uniqueness, generation/minimality, canonicalization invariants, persistent logical state, human-rating determinism, smart-generation metadata, explanation strategies, file/CLI behavior, concurrency/reentrancy, and property-based generation checks. Optional SAT cross-checking supplies an independent solving path.
 
 The nightly property workflow runs the heavier randomized/property profile separately from normal pull-request CI.
 
