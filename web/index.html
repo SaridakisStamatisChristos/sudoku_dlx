@@ -3,111 +3,557 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sudoku DLX Bitset — Web Demo</title>
+  <meta name="description" content="Run sudoku_dlx v1.1 directly in the browser: exact-cover solving, analysis, human-logic reasoning, and difficulty-targeted generation.">
+  <title>sudoku_dlx — Browser Lab</title>
   <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem;color:#111;background:#fafafa}
-    .grid{display:grid;grid-template-columns:repeat(9,2.2rem);gap:2px;margin:1rem 0}
-    input.cell{width:2.2rem;height:2.2rem;text-align:center;font-size:1.1rem;border:1px solid #ccc;background:#fff}
-    button{padding:.6rem .9rem;margin-right:.5rem;border:0;border-radius:.5rem;background:#111;color:#fff;cursor:pointer}
-    button.secondary{background:#555}
-    .log{white-space:pre-wrap;background:#fff;border:1px solid #ddd;padding:.8rem;border-radius:.5rem}
-    .foot{margin-top:1rem;color:#666;font-size:.9rem}
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --panel-soft: #f8fafc;
+      --text: #111827;
+      --muted: #667085;
+      --line: #d0d5dd;
+      --line-strong: #344054;
+      --accent: #175cd3;
+      --accent-strong: #1849a9;
+      --success: #067647;
+      --warning: #b54708;
+      --danger: #b42318;
+      --shadow: 0 16px 48px rgba(16, 24, 40, .08);
+      --radius: 18px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b0f17;
+        --panel: #121826;
+        --panel-soft: #171f2f;
+        --text: #f2f4f7;
+        --muted: #98a2b3;
+        --line: #344054;
+        --line-strong: #d0d5dd;
+        --accent: #84adff;
+        --accent-strong: #b2ccff;
+        --success: #75e0a7;
+        --warning: #fec84b;
+        --danger: #fda29b;
+        --shadow: 0 16px 48px rgba(0, 0, 0, .28);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    button, input, select { font: inherit; }
+    .shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .nav {
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 760; letter-spacing: -.02em; }
+    .mark {
+      width: 32px; height: 32px; border-radius: 9px;
+      display: grid; place-items: center;
+      background: var(--text); color: var(--panel);
+      font-size: 13px; font-weight: 800;
+    }
+    .navlinks { display: flex; gap: 18px; font-size: 14px; }
+    .hero { padding: 54px 0 26px; }
+    .eyebrow { color: var(--accent); font-weight: 750; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+    h1 { margin: 8px 0 12px; max-width: 760px; font-size: clamp(36px, 6vw, 64px); line-height: .98; letter-spacing: -.055em; }
+    .lede { max-width: 760px; margin: 0; color: var(--muted); font-size: clamp(16px, 2vw, 19px); line-height: 1.6; }
+    .runtime {
+      margin-top: 22px; display: inline-flex; align-items: center; gap: 9px;
+      border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+      padding: 8px 12px; color: var(--muted); font-size: 13px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
+    .dot.ready { background: var(--success); }
+    .dot.error { background: var(--danger); }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr); gap: 24px; padding: 18px 0 60px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .board-card { padding: clamp(18px, 3vw, 28px); }
+    .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+    .card-head h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+    .card-head p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .grid-wrap { width: min(100%, 540px); margin: 0 auto; }
+    .sudoku-grid {
+      display: grid; grid-template-columns: repeat(9, 1fr);
+      border: 2px solid var(--line-strong); border-radius: 10px; overflow: hidden;
+      background: var(--line-strong); gap: 1px; aspect-ratio: 1;
+    }
+    .cell {
+      min-width: 0; width: 100%; height: 100%; border: 0; border-radius: 0;
+      background: var(--panel); color: var(--text); text-align: center;
+      font-weight: 600; font-size: clamp(18px, 4vw, 28px); outline: none;
+      caret-color: var(--accent);
+    }
+    .cell:focus { box-shadow: inset 0 0 0 2px var(--accent); z-index: 2; }
+    .cell.given { font-weight: 820; background: var(--panel-soft); }
+    .cell.derived { color: var(--accent); }
+    .cell.box-right { border-right: 2px solid var(--line-strong); }
+    .cell.box-bottom { border-bottom: 2px solid var(--line-strong); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+    button {
+      border: 1px solid var(--line); border-radius: 10px; padding: 10px 15px;
+      background: var(--panel-soft); color: var(--text); cursor: pointer; font-weight: 680;
+      transition: transform .08s ease, border-color .15s ease, opacity .15s ease;
+    }
+    button:hover:not(:disabled) { border-color: var(--line-strong); transform: translateY(-1px); }
+    button:disabled { opacity: .5; cursor: wait; }
+    button.primary { background: var(--text); color: var(--panel); border-color: var(--text); }
+    .side { display: grid; gap: 16px; align-content: start; }
+    .panel { padding: 20px; }
+    .metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .metric { background: var(--panel-soft); border: 1px solid var(--line); border-radius: 12px; padding: 13px; min-height: 86px; }
+    .metric .label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 7px; }
+    .metric strong { display: block; font-size: 21px; letter-spacing: -.025em; }
+    .metric small { color: var(--muted); font-size: 11px; }
+    .generator { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: grid; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    label { color: var(--muted); font-size: 12px; font-weight: 650; }
+    select, input[type="number"] {
+      width: 100%; border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 11px; background: var(--panel-soft); color: var(--text); outline: none;
+    }
+    select:focus, input[type="number"]:focus { border-color: var(--accent); }
+    .logic-list { max-height: 280px; overflow: auto; margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+    .logic-list li { border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px; background: var(--panel-soft); font-size: 13px; }
+    .logic-list code { color: var(--accent); font-weight: 700; }
+    .empty { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .log {
+      margin-top: 14px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px;
+      background: var(--panel-soft); color: var(--muted); font-size: 12px; line-height: 1.5; min-height: 42px;
+    }
+    footer { border-top: 1px solid var(--line); padding: 28px 0 42px; color: var(--muted); font-size: 13px; }
+    footer .shell { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    @media (max-width: 860px) {
+      .workspace { grid-template-columns: 1fr; }
+      .navlinks { display: none; }
+      .hero { padding-top: 38px; }
+    }
+    @media (max-width: 520px) {
+      .shell { width: min(100% - 20px, 1180px); }
+      .board-card, .panel { padding: 14px; }
+      .generator { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      button { flex: 1 1 44%; }
+    }
   </style>
 </head>
 <body>
-  <h1>Sudoku DLX Bitset — Web Demo</h1>
-  <p>Enter digits (1–9), leave blanks empty. Solve runs in your browser via <a href="https://pyodide.org/" target="_blank">Pyodide</a>.</p>
-  <div id="grid" class="grid"></div>
-  <div>
-    <button id="solveBtn">Solve</button>
-    <button id="clearBtn" class="secondary">Clear</button>
-    <button id="sampleBtn" class="secondary">Load Sample</button>
-  </div>
-  <h3>Log</h3>
-  <div id="log" class="log">Initializing solver worker...</div>
-  <div class="foot">Algorithm: Exact cover (Algorithm X / DLX). Implementation © 2025 Stamatis-Christos Saridakis — MIT.</div>
+  <header>
+    <div class="shell nav">
+      <div class="brand"><span class="mark">81</span><span>sudoku_dlx</span></div>
+      <nav class="navlinks" aria-label="Project links">
+        <a href="./docs/">Docs</a>
+        <a href="./visualizer.html">Trace replay</a>
+        <a href="https://github.com/SaridakisStamatisChristos/sudoku_dlx">GitHub</a>
+        <a href="https://github.com/SaridakisStamatisChristos/sudoku_dlx/releases/tag/v1.1.0">v1.1.0</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="eyebrow">v1.1 browser lab</div>
+      <h1>Exact-cover speed. Human-style reasoning.</h1>
+      <p class="lede">Solve, analyze, explain, and generate Sudoku puzzles entirely in your browser. This page installs the same packaged <code>sudoku_dlx</code> wheel built from the repository—no separate demo solver.</p>
+      <div class="runtime"><span id="runtimeDot" class="dot"></span><span id="runtimeText">Initializing Python runtime…</span></div>
+    </section>
+
+    <section class="workspace">
+      <div class="card board-card">
+        <div class="card-head">
+          <div>
+            <h2>Puzzle board</h2>
+            <p>Type 1–9. Arrow keys move between cells. All computation stays in the browser.</p>
+          </div>
+        </div>
+        <div class="grid-wrap"><div id="grid" class="sudoku-grid" role="grid" aria-label="Sudoku grid"></div></div>
+        <div class="actions">
+          <button id="solveBtn" class="primary">Solve</button>
+          <button id="analyzeBtn">Analyze</button>
+          <button id="logicBtn">Human Logic</button>
+          <button id="sampleBtn">Load Sample</button>
+          <button id="clearBtn">Clear</button>
+        </div>
+        <div id="log" class="log" aria-live="polite">Booting Pyodide and loading the project wheel…</div>
+      </div>
+
+      <div class="side">
+        <section class="card panel">
+          <div class="card-head">
+            <div><h2>Analysis</h2><p>Machine Difficulty v3 and Human Difficulty v1 are intentionally separate.</p></div>
+          </div>
+          <div class="metrics">
+            <div class="metric"><span class="label">Validity</span><strong id="validMetric">—</strong><small id="uniqueMetric">not analyzed</small></div>
+            <div class="metric"><span class="label">Givens</span><strong id="givensMetric">—</strong><small id="solveMetric">puzzle state</small></div>
+            <div class="metric"><span class="label">Machine difficulty</span><strong id="machineMetric">—</strong><small>Difficulty v3</small></div>
+            <div class="metric"><span class="label">Human difficulty</span><strong id="humanMetric">—</strong><small id="humanDetail">Human v1</small></div>
+          </div>
+        </section>
+
+        <section class="card panel">
+          <div class="card-head"><div><h2>Smart generation</h2><p>Deterministic bounded search with optional human-difficulty targeting.</p></div></div>
+          <div class="generator">
+            <div class="field">
+              <label for="difficulty">Human target</label>
+              <select id="difficulty">
+                <option value="any">Any</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+                <option value="expert">Expert</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="symmetry">Symmetry</label>
+              <select id="symmetry">
+                <option value="mix">Mix</option>
+                <option value="rot180">180° rotational</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+            <div class="field full">
+              <label for="seed">Seed (optional)</label>
+              <input id="seed" type="number" inputmode="numeric" placeholder="7331">
+            </div>
+            <div class="field full"><button id="generateBtn" class="primary">Generate puzzle</button></div>
+          </div>
+        </section>
+
+        <section class="card panel">
+          <div class="card-head"><div><h2>Human logic trace</h2><p id="logicSummary">Run Human Logic to inspect the deterministic strategy path.</p></div></div>
+          <ol id="logicList" class="logic-list"><li class="empty">No logical trace yet.</li></ol>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell">
+      <span>© 2025–2026 Stamatis-Christos Saridakis · MIT</span>
+      <span>Algorithm X exact cover · persistent logical state · Pyodide</span>
+    </div>
+  </footer>
 
   <script>
-    const gridEl = document.getElementById('grid');
-    const logEl = document.getElementById('log');
-    const solveBtn = document.getElementById('solveBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const sampleBtn = document.getElementById('sampleBtn');
-    function mkCell(){ const i=document.createElement('input'); i.className='cell'; i.maxLength=1; i.pattern='[1-9]'; i.inputMode='numeric'; return i; }
-    for(let r=0;r<9;r++){ for(let c=0;c<9;c++){ gridEl.appendChild(mkCell()); }}
+    const sample = (
+      "53..7...." +
+      "6..195..." +
+      ".98....6." +
+      "8...6...3" +
+      "4..8.3..1" +
+      "7...2...6" +
+      ".6....28." +
+      "...419..5" +
+      "....8..79"
+    );
 
-    function readGrid(){
-      const v=[]; const cells=[...gridEl.querySelectorAll('input.cell')];
-      for(let i=0;i<81;i++){ const ch=cells[i].value.trim(); v.push(ch?parseInt(ch,10):0); }
-      return v;
+    const els = {
+      grid: document.getElementById("grid"),
+      log: document.getElementById("log"),
+      runtimeDot: document.getElementById("runtimeDot"),
+      runtimeText: document.getElementById("runtimeText"),
+      solve: document.getElementById("solveBtn"),
+      analyze: document.getElementById("analyzeBtn"),
+      logic: document.getElementById("logicBtn"),
+      sample: document.getElementById("sampleBtn"),
+      clear: document.getElementById("clearBtn"),
+      generate: document.getElementById("generateBtn"),
+      difficulty: document.getElementById("difficulty"),
+      symmetry: document.getElementById("symmetry"),
+      seed: document.getElementById("seed"),
+      valid: document.getElementById("validMetric"),
+      unique: document.getElementById("uniqueMetric"),
+      givens: document.getElementById("givensMetric"),
+      solveMetric: document.getElementById("solveMetric"),
+      machine: document.getElementById("machineMetric"),
+      human: document.getElementById("humanMetric"),
+      humanDetail: document.getElementById("humanDetail"),
+      logicSummary: document.getElementById("logicSummary"),
+      logicList: document.getElementById("logicList"),
+    };
+
+    let ready = false;
+    let busy = false;
+    let givenMask = Array(81).fill(false);
+    let requestCounter = 0;
+    const pending = new Map();
+
+    function createGrid() {
+      for (let i = 0; i < 81; i++) {
+        const input = document.createElement("input");
+        const r = Math.floor(i / 9), c = i % 9;
+        input.className = "cell";
+        if (c === 2 || c === 5) input.classList.add("box-right");
+        if (r === 2 || r === 5) input.classList.add("box-bottom");
+        input.maxLength = 1;
+        input.inputMode = "numeric";
+        input.pattern = "[1-9]";
+        input.autocomplete = "off";
+        input.setAttribute("aria-label", `Row ${r + 1}, column ${c + 1}`);
+        input.dataset.index = String(i);
+        input.addEventListener("input", () => {
+          input.value = input.value.replace(/[^1-9]/g, "").slice(-1);
+          givenMask[i] = input.value !== "";
+          input.classList.toggle("given", givenMask[i]);
+          input.classList.remove("derived");
+          resetMetrics();
+        });
+        input.addEventListener("keydown", (event) => moveByArrow(event, i));
+        els.grid.appendChild(input);
+      }
     }
-    function writeGrid(v){
-      const cells=[...gridEl.querySelectorAll('input.cell')];
-      for(let i=0;i<81;i++){ cells[i].value = v[i]?String(v[i]):''; }
+
+    function moveByArrow(event, index) {
+      const moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -9, ArrowDown: 9 };
+      if (!(event.key in moves)) return;
+      const next = index + moves[event.key];
+      if (next < 0 || next >= 81) return;
+      if (event.key === "ArrowLeft" && index % 9 === 0) return;
+      if (event.key === "ArrowRight" && index % 9 === 8) return;
+      event.preventDefault();
+      cells()[next].focus();
     }
 
-    const worker = new Worker(new URL('./worker.js', window.location.href), { type: 'classic' });
+    function cells() { return [...els.grid.querySelectorAll(".cell")]; }
 
-    function log(msg){ logEl.textContent = msg; }
-    function setSolving(flag){ solveBtn.disabled = flag; solveBtn.textContent = flag ? 'Solving…' : 'Solve'; }
+    function readValues() {
+      return cells().map((cell) => cell.value ? Number(cell.value) : 0);
+    }
 
-    worker.onmessage = (event)=>{
-      const { type } = event.data || {};
-      if (type === 'status') {
-        log(event.data.message);
+    function writeGrid(grid, preserveGivens = true) {
+      const flat = Array.isArray(grid[0]) ? grid.flat() : grid;
+      cells().forEach((cell, i) => {
+        const value = Number(flat[i] || 0);
+        cell.value = value ? String(value) : "";
+        cell.classList.toggle("given", preserveGivens && givenMask[i] && value !== 0);
+        cell.classList.toggle("derived", value !== 0 && !(preserveGivens && givenMask[i]));
+      });
+    }
+
+    function loadString(text) {
+      const normalized = text.replace(/\s+/g, "").slice(0, 81);
+      givenMask = [...normalized].map((ch) => /[1-9]/.test(ch));
+      writeGrid([...normalized].map((ch) => /[1-9]/.test(ch) ? Number(ch) : 0));
+      resetMetrics();
+      clearLogic();
+    }
+
+    function clearBoard() {
+      givenMask = Array(81).fill(false);
+      writeGrid(Array(81).fill(0), false);
+      resetMetrics();
+      clearLogic();
+      log("Board cleared.");
+      cells()[0].focus();
+    }
+
+    function resetMetrics() {
+      els.valid.textContent = "—";
+      els.unique.textContent = "not analyzed";
+      els.givens.textContent = "—";
+      els.solveMetric.textContent = "puzzle state";
+      els.machine.textContent = "—";
+      els.human.textContent = "—";
+      els.humanDetail.textContent = "Human v1";
+    }
+
+    function clearLogic() {
+      els.logicSummary.textContent = "Run Human Logic to inspect the deterministic strategy path.";
+      els.logicList.innerHTML = '<li class="empty">No logical trace yet.</li>';
+    }
+
+    function log(message) { els.log.textContent = message; }
+
+    function setRuntime(message, state = "loading") {
+      els.runtimeText.textContent = message;
+      els.runtimeDot.className = `dot${state === "ready" ? " ready" : state === "error" ? " error" : ""}`;
+    }
+
+    function setBusy(flag, message) {
+      busy = flag;
+      [els.solve, els.analyze, els.logic, els.generate].forEach((button) => button.disabled = flag || !ready);
+      els.sample.disabled = flag;
+      els.clear.disabled = flag;
+      if (message) log(message);
+    }
+
+    function request(action, payload = {}) {
+      if (!ready) return Promise.reject(new Error("Runtime is not ready"));
+      const requestId = ++requestCounter;
+      return new Promise((resolve, reject) => {
+        pending.set(requestId, { resolve, reject });
+        worker.postMessage({ type: action, requestId, ...payload });
+      });
+    }
+
+    function fillAnalysis(data) {
+      els.valid.textContent = data.valid ? "Valid" : "Invalid";
+      els.unique.textContent = data.valid ? (data.unique ? "unique solution" : "not unique") : "duplicate / malformed clues";
+      els.givens.textContent = String(data.givens ?? "—");
+      els.solveMetric.textContent = data.solvable ? "solvable" : "not solvable";
+      els.machine.textContent = Number.isFinite(data.difficulty) ? Number(data.difficulty).toFixed(1) : "—";
+      const human = data.human || {};
+      els.human.textContent = human.label ? human.label[0].toUpperCase() + human.label.slice(1) : "—";
+      els.humanDetail.textContent = human.score !== undefined
+        ? `${Number(human.score).toFixed(1)} · ${human.steps} steps${human.solved_logically ? " · solved logically" : " · logic stalls"}`
+        : "Human v1";
+    }
+
+    function renderLogic(payload) {
+      const steps = payload.steps || [];
+      const rating = payload.rating || {};
+      const state = payload.solved ? "solved" : payload.stalled ? "stalled" : payload.limit_reached ? "step limit" : "incomplete";
+      els.logicSummary.textContent = `${steps.length} steps · ${state}${payload.hardest_strategy ? ` · hardest: ${payload.hardest_strategy}` : ""}`;
+      els.logicList.innerHTML = "";
+      if (!steps.length) {
+        els.logicList.innerHTML = '<li class="empty">No deterministic move was available.</li>';
         return;
       }
-      if (type === 'result') {
-        setSolving(false);
-        if (event.data.status === 'ok') {
-          const timeMsg = typeof event.data.ms === 'number' ? `${event.data.ms.toFixed(2)} ms` : 'unknown time';
-          if (event.data.solutions > 1) {
-            log(`Multiple solutions (${event.data.solutions}). Showing one. Solved in ${timeMsg}.`);
-          } else {
-            log(`Solved in ${timeMsg}.`);
-          }
-          writeGrid(event.data.grid);
-        } else if (event.data.status === 'none') {
-          log('No solution (contradiction).');
-        }
+      steps.slice(0, 80).forEach((step, index) => {
+        const li = document.createElement("li");
+        const position = Number.isInteger(step.r) && Number.isInteger(step.c) ? `r${step.r + 1}c${step.c + 1}` : "board";
+        const detail = step.type === "place"
+          ? `place ${step.v} at ${position}`
+          : `eliminate ${step.v ?? step.digit ?? "candidate"} at ${position}`;
+        li.innerHTML = `<code>${String(index + 1).padStart(2, "0")} · ${escapeHtml(step.strategy || step.type || "move")}</code><br>${escapeHtml(detail)}`;
+        els.logicList.appendChild(li);
+      });
+      if (steps.length > 80) {
+        const li = document.createElement("li");
+        li.className = "empty";
+        li.textContent = `${steps.length - 80} additional steps omitted from the panel.`;
+        els.logicList.appendChild(li);
+      }
+      els.human.textContent = rating.label ? rating.label[0].toUpperCase() + rating.label.slice(1) : "—";
+      els.humanDetail.textContent = rating.score !== undefined ? `${Number(rating.score).toFixed(1)} · ${rating.steps} steps` : "Human v1";
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+    }
+
+    const worker = new Worker(new URL("./worker.js", window.location.href), { type: "classic" });
+
+    worker.onmessage = (event) => {
+      const data = event.data || {};
+      if (data.type === "status") {
+        setRuntime(data.message, "loading");
+        log(data.message);
         return;
       }
-      if (type === 'error') {
-        setSolving(false);
-        console.error('Worker error', event.data.detail || event.data.message);
-        log(event.data.message || 'An unexpected error occurred.');
+      if (data.type === "ready") {
+        ready = true;
+        setRuntime("Actual sudoku_dlx wheel loaded", "ready");
+        setBusy(false);
+        log("Ready. Solve, analyze, run human logic, or generate a puzzle.");
         return;
+      }
+      if (data.type === "result" || data.type === "error") {
+        const waiter = pending.get(data.requestId);
+        if (!waiter) return;
+        pending.delete(data.requestId);
+        if (data.type === "error") waiter.reject(new Error(data.detail || data.message));
+        else waiter.resolve(data.payload);
       }
     };
 
-    worker.postMessage({ type: 'init' });
+    worker.onerror = (event) => {
+      ready = false;
+      setRuntime("Browser runtime failed", "error");
+      setBusy(false);
+      log(event.message || "Worker failed to initialize.");
+    };
 
-    solveBtn.onclick = ()=>{
-      setSolving(true);
-      log('Solving...');
-      const v = readGrid();
-      worker.postMessage({ type: 'solve', values: v });
-    };
-    clearBtn.onclick = ()=>{ writeGrid(Array(81).fill(0)); if (!solveBtn.disabled) { log('Cleared.'); } };
-    sampleBtn.onclick = ()=>{
-      // Normalize multiline samples to exactly 81 characters (digits or '.')
-      let sample = `
-        53..7....
-        6..195...
-        .98....6.
-        8...6...3
-        4..8.3..1
-        7...2...6
-        .6....28.
-        ...419..5
-        ....8..79
-      `;
-      sample = sample.replace(/\s+/g, '');
-      const normalized = (sample + '.'.repeat(81)).slice(0, 81);
-      const arr=[...normalized].map(ch=> ch==='.'?0:parseInt(ch,10));
-      writeGrid(arr);
-      if (!solveBtn.disabled) { log('Loaded sample. Click Solve.'); }
-    };
+    async function runAction(button, task, busyText) {
+      if (busy) return;
+      setBusy(true, busyText);
+      const original = button.textContent;
+      button.textContent = "Working…";
+      try { await task(); }
+      catch (error) { log(`Error: ${error.message}`); }
+      finally { button.textContent = original; setBusy(false); }
+    }
+
+    els.solve.onclick = () => runAction(els.solve, async () => {
+      const values = readValues();
+      givenMask = values.map((v) => v !== 0);
+      const result = await request("solve", { values });
+      if (!result.ok) {
+        log(result.reason === "invalid" ? "Invalid Sudoku clues: check rows, columns, and boxes." : "No solution exists for this puzzle.");
+        return;
+      }
+      writeGrid(result.grid);
+      const uniqueness = result.solutions === 1 ? "unique" : "multiple solutions";
+      log(`Solved · ${uniqueness} · ${result.stats.nodes} nodes · ${result.stats.backtracks} backtracks · ${Number(result.stats.ms).toFixed(2)} ms engine time.`);
+    }, "Solving with the exact-cover engine…");
+
+    els.analyze.onclick = () => runAction(els.analyze, async () => {
+      const result = await request("analyze", { values: readValues() });
+      fillAnalysis(result);
+      log(result.valid ? `Analysis complete · package v${result.package_version}.` : "Analysis complete: the current clues are invalid.");
+    }, "Computing exact-cover and human difficulty analysis…");
+
+    els.logic.onclick = () => runAction(els.logic, async () => {
+      const values = readValues();
+      givenMask = values.map((v) => v !== 0);
+      const result = await request("logic", { values });
+      if (!result.ok) {
+        log("Human logic cannot run because the current clues are invalid.");
+        return;
+      }
+      renderLogic(result);
+      writeGrid(result.grid);
+      log(result.solved ? "Solved using the built-in deterministic human strategy stack." : "Human strategy stack stopped before a complete solution.");
+    }, "Running persistent human-logic state…");
+
+    els.generate.onclick = () => runAction(els.generate, async () => {
+      const result = await request("generate", {
+        difficulty: els.difficulty.value,
+        symmetry: els.symmetry.value,
+        seed: els.seed.value,
+      });
+      givenMask = result.grid.flat().map((v) => v !== 0);
+      writeGrid(result.grid);
+      els.givens.textContent = String(result.givens);
+      els.machine.textContent = Number(result.machine_difficulty).toFixed(1);
+      els.human.textContent = result.human_difficulty.label[0].toUpperCase() + result.human_difficulty.label.slice(1);
+      els.humanDetail.textContent = `${Number(result.human_difficulty.score).toFixed(1)} · ${result.human_difficulty.steps} steps`;
+      els.valid.textContent = "Valid";
+      els.unique.textContent = "unique solution";
+      els.solveMetric.textContent = `${result.symmetry} · ${result.attempts} attempt${result.attempts === 1 ? "" : "s"}`;
+      clearLogic();
+      log(`Generated ${result.human_difficulty.label} puzzle · seed ${result.seed ?? "random"} · ${result.givens} givens.`);
+    }, "Searching for a puzzle that matches the requested profile…");
+
+    els.sample.onclick = () => { loadString(sample); log("Sample loaded."); };
+    els.clear.onclick = clearBoard;
+
+    createGrid();
+    setBusy(true);
+    worker.postMessage({ type: "init" });
   </script>
 </body>
 </html>

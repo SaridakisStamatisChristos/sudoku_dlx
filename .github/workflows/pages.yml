@@ -29,16 +29,38 @@ jobs:
           cache-dependency-path: pyproject.toml
       - uses: actions/configure-pages@v4
 
-      - name: Install docs dependencies
+      - name: Install site dependencies
         run: |
-          python -m pip install -U pip
+          python -m pip install -U pip build
           python -m pip install -e ".[dev]"
+
+      - name: Build browser wheel
+        run: python -m build --wheel
 
       - name: Assemble demo and documentation site
         run: |
           rm -rf _pages
-          mkdir -p _pages
+          mkdir -p _pages/assets
           cp -R web/. _pages/
+          cp dist/*.whl _pages/assets/
+          python - <<'PY'
+          import glob
+          import json
+          import os
+          from pathlib import Path
+          import sudoku_dlx
+
+          wheels = glob.glob("dist/*.whl")
+          if len(wheels) != 1:
+              raise SystemExit(f"expected exactly one wheel, found {len(wheels)}")
+          manifest = {
+              "version": sudoku_dlx.__version__,
+              "filename": os.path.basename(wheels[0]),
+          }
+          Path("_pages/assets/wheel.json").write_text(
+              json.dumps(manifest, separators=(",", ":")), encoding="utf-8"
+          )
+          PY
           mkdocs build --strict --site-dir _pages/docs
 
       - name: Upload combined Pages artifact
