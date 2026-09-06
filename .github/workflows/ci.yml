@@ -36,6 +36,9 @@ jobs:
       - name: Deterministic search-work regression gate
         if: matrix.python-version == '3.12'
         run: python bench/regression.py
+      - name: Validate browser JavaScript
+        if: matrix.python-version == '3.12'
+        run: python tools/check_web_scripts.py
       - name: Build docs strictly
         if: matrix.python-version == '3.12'
         run: mkdocs build --strict
