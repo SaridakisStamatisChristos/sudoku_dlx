@@ -182,7 +182,7 @@ def analyze(grid: Grid) -> Dict[str, Any]:
         }
 
     from .canonical import canonical_form
-    from .rating import _rate_canonical
+    from .rating import rate_canonical
 
     givens = sum(1 for r in range(9) for c in range(9) if grid[r][c] != 0)
     valid = is_valid(grid)
@@ -201,7 +201,7 @@ def analyze(grid: Grid) -> Dict[str, Any]:
         nodes = int(solved.stats.nodes)
         backs = int(solved.stats.backtracks)
 
-    difficulty = _rate_canonical(canonical) if valid else 10.0
+    difficulty = rate_canonical(canonical) if valid else 10.0
     return {
         "version": ANALYZE_VERSION,
         "valid": valid,

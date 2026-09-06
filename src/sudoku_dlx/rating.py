@@ -37,6 +37,12 @@ def _rate_canonical(signature: str) -> float:
     return round(10.0 * min(max(score01, 0.0), 1.0), 1)
 
 
+def rate_canonical(signature: str) -> float:
+    """Rate an already-canonical row-major puzzle string using Difficulty v3."""
+
+    return _rate_canonical(signature)
+
+
 def rate(grid: Grid) -> float:
     """
     Return deterministic heuristic difficulty in ``[0, 10]``.
@@ -47,7 +53,7 @@ def rate(grid: Grid) -> float:
 
     if not is_valid(grid):
         return 10.0
-    return _rate_canonical(canonical_form(grid))
+    return rate_canonical(canonical_form(grid))
 
 
 __all__ = ["DIFFICULTY_VERSION", "rate"]
