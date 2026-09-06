@@ -167,6 +167,32 @@ def _minimality_name(minimal: bool, symmetry: Symmetry) -> str:
     return "orbit" if symmetry == "rot180" else "strict"
 
 
+def _finalize_result(
+    grid: Grid,
+    *,
+    seed: Optional[int],
+    attempts: int,
+    symmetry: Symmetry,
+    minimal: bool,
+    human: Optional[HumanRating] = None,
+) -> GenerationResult:
+    solved = solve(grid, collect_stats=False)
+    if solved is None:
+        raise AssertionError("generator produced an unsatisfiable puzzle")
+    human_rating = human if human is not None else human_rate(grid)
+    return GenerationResult(
+        grid=[row[:] for row in grid],
+        solution=[row[:] for row in solved.grid],
+        seed=seed,
+        attempts=attempts,
+        givens=_remaining_clues(grid),
+        symmetry=symmetry,
+        minimality=_minimality_name(minimal, symmetry),
+        machine_difficulty=rate(grid),
+        human_difficulty=human_rating,
+    )
+
+
 def generate(
     seed: Optional[int] = None,
     *,
@@ -222,19 +248,12 @@ def generate_result(
         minimal=minimal,
         symmetry=symmetry,
     )
-    solved = solve(grid, collect_stats=False)
-    if solved is None:
-        raise AssertionError("generator produced an unsatisfiable puzzle")
-    return GenerationResult(
-        grid=[row[:] for row in grid],
-        solution=[row[:] for row in solved.grid],
+    return _finalize_result(
+        grid,
         seed=seed,
         attempts=1,
-        givens=_remaining_clues(grid),
         symmetry=symmetry,
-        minimality=_minimality_name(minimal, symmetry),
-        machine_difficulty=rate(grid),
-        human_difficulty=human_rate(grid),
+        minimal=minimal,
     )
 
 
@@ -265,23 +284,23 @@ def generate_rated(
     rng = random.Random(seed)
     for attempt in range(1, max_attempts + 1):
         candidate_seed = rng.randrange(2**31 - 1)
-        result = generate_result(
+        grid = generate(
             seed=candidate_seed,
             target_givens=givens,
             minimal=minimal,
             symmetry=symmetry,
         )
-        if result.human_difficulty.label == human_difficulty:
-            return GenerationResult(
-                grid=result.grid,
-                solution=result.solution,
+        human = human_rate(grid)
+        if human.label == human_difficulty:
+            # Machine Difficulty v3 requires canonicalization and exact-cover work;
+            # defer it until a candidate has actually passed the human target.
+            return _finalize_result(
+                grid,
                 seed=candidate_seed,
                 attempts=attempt,
-                givens=result.givens,
-                symmetry=result.symmetry,
-                minimality=result.minimality,
-                machine_difficulty=result.machine_difficulty,
-                human_difficulty=result.human_difficulty,
+                symmetry=symmetry,
+                minimal=minimal,
+                human=human,
             )
 
     raise RuntimeError(

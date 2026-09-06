@@ -6,6 +6,7 @@ from sudoku_dlx import (
     HUMAN_DIFFICULTY_VERSION,
     count_solutions,
     from_string,
+    generate_rated,
     generate_result,
     human_rate,
     logical_solve,
@@ -82,14 +83,34 @@ def test_generation_result_is_reproducible_and_self_consistent():
     assert count_solutions(first.grid, limit=2) == 1
 
 
-def test_generate_rated_retry_logic_is_deterministic(monkeypatch):
+def test_generate_rated_easy_end_to_end():
+    result = generate_rated(
+        "easy",
+        seed=7331,
+        target_givens=45,
+        symmetry="mix",
+        max_attempts=8,
+    )
+
+    assert result.human_difficulty.label == "easy"
+    assert result.human_difficulty.solved_logically
+    assert 1 <= result.attempts <= 8
+    assert count_solutions(result.grid, limit=2) == 1
+
+
+def test_generate_rated_retry_logic_is_deterministic_and_defers_machine_rating(monkeypatch):
     generate_module = importlib.import_module("sudoku_dlx.generate")
     calls = []
+    machine_rate_calls = 0
+    solved_grid = from_string(SOLVED)
 
-    def fake_result(seed=None, **kwargs):
+    def fake_generate(seed=None, **kwargs):
         calls.append(seed)
+        return [row[:] for row in solved_grid]
+
+    def fake_human_rate(_grid):
         label = "medium" if len(calls) == 2 else "easy"
-        rating = generate_module.HumanRating(
+        return generate_module.HumanRating(
             version="1",
             score=4.0 if label == "medium" else 2.0,
             label=label,
@@ -99,34 +120,33 @@ def test_generate_rated_retry_logic_is_deterministic(monkeypatch):
             eliminations=0,
             hardest_strategy="hidden_single",
         )
-        grid = from_string(SOLVED)
-        return generate_module.GenerationResult(
-            grid=grid,
-            solution=grid,
-            seed=seed,
-            attempts=1,
-            givens=81,
-            symmetry="mix",
-            minimality="none",
-            machine_difficulty=0.0,
-            human_difficulty=rating,
-        )
 
-    monkeypatch.setattr(generate_module, "generate_result", fake_result)
+    def fake_rate(_grid):
+        nonlocal machine_rate_calls
+        machine_rate_calls += 1
+        return 3.0
+
+    class FakeSolve:
+        grid = solved_grid
+
+    monkeypatch.setattr(generate_module, "generate", fake_generate)
+    monkeypatch.setattr(generate_module, "human_rate", fake_human_rate)
+    monkeypatch.setattr(generate_module, "rate", fake_rate)
+    monkeypatch.setattr(generate_module, "solve", lambda _grid, collect_stats=False: FakeSolve())
 
     result = generate_module.generate_rated("medium", seed=123, max_attempts=3)
 
     assert result.attempts == 2
     assert result.human_difficulty.label == "medium"
     assert len(calls) == 2
+    assert machine_rate_calls == 1
 
 
 def test_generate_rated_validates_inputs():
-    generate_module = importlib.import_module("sudoku_dlx.generate")
     with pytest.raises(ValueError):
-        generate_module.generate_rated("impossible")
+        generate_rated("impossible")
     with pytest.raises(ValueError):
-        generate_module.generate_rated("easy", max_attempts=0)
+        generate_rated("easy", max_attempts=0)
 
 
 def test_machine_rating_cache_is_bounded():
