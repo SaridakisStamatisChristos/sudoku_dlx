@@ -27,7 +27,7 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: pyproject.toml
-      - uses: actions/configure-pages@v4
+      - uses: actions/configure-pages@v6
 
       - name: Install site dependencies
         run: |
