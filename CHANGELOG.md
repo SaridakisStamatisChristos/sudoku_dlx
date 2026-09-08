@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased
+
+### Fixes
+
+- Full logical runs now surface strategy contradictions through `LogicalResult.contradiction` instead of leaking an internal `RuntimeError` through `logical_solve()`, `human_rate()`, and rated generation.
+- Candidate contradiction detection now includes missing digit support in rows, columns, and boxes, not only empty per-cell candidate sets.
+- Human Difficulty v1 now assigns the intended weights to the actual `x_wing_row`, `x_wing_col`, `swordfish_row`, and `swordfish_col` move names.
+- Default `generate_rated()` searches a deterministic difficulty-specific clue-count profile when `target_givens` is omitted, while explicit `target_givens` remains fixed across attempts.
+- Rated generation never accepts an internally contradictory human-logic path as an `expert` match.
+- Added executable seed-7331 rated-generation regressions plus a nightly exact-solver oracle sweep that checks every human placement/elimination against the unique DLX solution.
+
 ## [1.1.0] - 2026-09-06
 
 ### Human logic
