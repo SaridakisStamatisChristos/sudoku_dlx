@@ -12,6 +12,8 @@ All notable changes to this project are documented here.
 - Default `generate_rated()` searches a deterministic difficulty-specific clue-count profile when `target_givens` is omitted, while explicit `target_givens` remains fixed across attempts.
 - Rated generation never accepts an internally contradictory human-logic path as an `expert` match.
 - Added executable seed-7331 rated-generation regressions plus a nightly exact-solver oracle sweep that checks every human placement/elimination against the unique DLX solution.
+- Fixed `apply_naked_triple()` source-cell corruption caused by reusing the third source-cell variable as the elimination-loop column variable; naked triples now keep all three source cells immutable during eliminations.
+- Naked triples now require exactly three distinct candidate digits, and seed 7343 is covered by a normal PR-gating DLX-oracle regression in addition to the broader nightly sweep.
 
 ## [1.1.0] - 2026-09-06
 

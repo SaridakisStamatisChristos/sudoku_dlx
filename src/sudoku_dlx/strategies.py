@@ -316,29 +316,28 @@ def apply_naked_triple(grid: Grid, cand: Cand) -> Optional[Dict]:
                 for (r, c) in cells
                 if grid[r][c] == 0 and 1 < len(cand[r][c]) <= 3
             ]
-            for (a, b, c) in _triples(small):
-                r1, c1 = a
-                r2, c2 = b
-                r3, c3 = c
+            for triple_cells in _triples(small):
+                (r1, c1), (r2, c2), (r3, c3) = triple_cells
                 union = cand[r1][c1] | cand[r2][c2] | cand[r3][c3]
-                if 2 <= len(union) <= 3 and cand[r1][c1] <= union and cand[r2][c2] <= union and cand[r3][c3] <= union:
-                    for (r, c) in cells:
-                        if (r, c) in (a, b, c) or grid[r][c] != 0:
-                            continue
-                        inter = cand[r][c] & union
-                        if inter:
-                            v = sorted(inter)[0]
-                            cand[r][c].remove(v)
-                            return {
-                                "type": "eliminate",
-                                "strategy": "naked_triple",
-                                "unit": kind,
-                                "unit_index": idx,
-                                "r": r,
-                                "c": c,
-                                "v": v,
-                                "triple": sorted(union),
-                            }
+                if len(union) != 3:
+                    continue
+                for rr, cc in cells:
+                    if (rr, cc) in triple_cells or grid[rr][cc] != 0:
+                        continue
+                    inter = cand[rr][cc] & union
+                    if inter:
+                        v = sorted(inter)[0]
+                        cand[rr][cc].remove(v)
+                        return {
+                            "type": "eliminate",
+                            "strategy": "naked_triple",
+                            "unit": kind,
+                            "unit_index": idx,
+                            "r": rr,
+                            "c": cc,
+                            "v": v,
+                            "triple": sorted(union),
+                        }
     return None
 
 
