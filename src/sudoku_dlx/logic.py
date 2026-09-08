@@ -62,6 +62,10 @@ _STRATEGY_WEIGHT = {
 }
 
 
+class _LogicalContradiction(RuntimeError):
+    """Internal signal that the human candidate state became impossible."""
+
+
 @dataclass
 class LogicalResult:
     grid: Grid
@@ -143,7 +147,7 @@ class LogicalState:
                     self.candidates[r][c].intersection_update(legal[r][c])
         self.contradiction = self._has_contradiction()
         if self.contradiction:
-            raise RuntimeError("logical solver reached a contradictory candidate state")
+            raise _LogicalContradiction("logical solver reached a contradictory candidate state")
 
     def _record(self, move: Move) -> Move:
         self.steps.append(move)
@@ -171,7 +175,7 @@ class LogicalState:
             if move:
                 self.contradiction = self._has_contradiction()
                 if self.contradiction:
-                    raise RuntimeError(
+                    raise _LogicalContradiction(
                         f"logical strategy {move.get('strategy', '<unknown>')} produced a contradiction"
                     )
                 return self._record(move)
@@ -190,7 +194,7 @@ class LogicalState:
                 break
             try:
                 move = self.step()
-            except RuntimeError:
+            except _LogicalContradiction:
                 # step() deliberately remains strict for callers debugging one
                 # strategy at a time. A full logical run, however, has a public
                 # contradiction result and must return it rather than crash.
