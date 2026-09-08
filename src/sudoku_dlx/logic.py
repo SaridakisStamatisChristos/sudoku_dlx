@@ -39,6 +39,8 @@ _ELIMINATION_STRATEGIES = (
     apply_simple_coloring,
 )
 
+# Strategy names are the exact public move names emitted by strategies.py.
+# Keep the generic aliases for compatibility with externally supplied traces.
 _STRATEGY_WEIGHT = {
     "naked_single": 1.0,
     "hidden_single": 2.0,
@@ -51,9 +53,17 @@ _STRATEGY_WEIGHT = {
     "naked_triple": 5.0,
     "hidden_triple": 5.0,
     "x_wing": 6.0,
+    "x_wing_row": 6.0,
+    "x_wing_col": 6.0,
     "swordfish": 7.5,
+    "swordfish_row": 7.5,
+    "swordfish_col": 7.5,
     "simple_coloring": 8.5,
 }
+
+
+class _LogicalContradiction(RuntimeError):
+    """Internal signal that the human candidate state became impossible."""
 
 
 @dataclass
@@ -77,6 +87,7 @@ class HumanRating:
     placements: int
     eliminations: int
     hardest_strategy: Optional[str]
+    contradiction: bool = False
 
 
 class LogicalState:
@@ -91,12 +102,40 @@ class LogicalState:
         self.contradiction = self._has_contradiction()
         self.hardest_strategy: Optional[str] = None
 
+    @staticmethod
+    def _unit_cells(kind: str, idx: int) -> list[tuple[int, int]]:
+        if kind == "row":
+            return [(idx, c) for c in range(9)]
+        if kind == "col":
+            return [(r, idx) for r in range(9)]
+        br, bc = (idx // 3) * 3, (idx % 3) * 3
+        return [(br + dr, bc + dc) for dr in range(3) for dc in range(3)]
+
     def _has_contradiction(self) -> bool:
-        return any(
+        # Cell-level contradiction: an unfilled cell has no remaining value.
+        if any(
             self.grid[r][c] == 0 and not self.candidates[r][c]
             for r in range(9)
             for c in range(9)
-        )
+        ):
+            return True
+
+        # Unit-level contradiction: a digit missing from a row/column/box has
+        # no candidate position left. This catches unsound eliminations before
+        # they necessarily collapse a particular cell to the empty set.
+        for kind in ("row", "col", "box"):
+            for idx in range(9):
+                cells = self._unit_cells(kind, idx)
+                placed = {self.grid[r][c] for r, c in cells if self.grid[r][c] != 0}
+                for digit in range(1, 10):
+                    if digit in placed:
+                        continue
+                    if not any(
+                        self.grid[r][c] == 0 and digit in self.candidates[r][c]
+                        for r, c in cells
+                    ):
+                        return True
+        return False
 
     def _refresh_after_placement(self) -> None:
         legal = candidates(self.grid)
@@ -108,7 +147,7 @@ class LogicalState:
                     self.candidates[r][c].intersection_update(legal[r][c])
         self.contradiction = self._has_contradiction()
         if self.contradiction:
-            raise RuntimeError("logical solver reached a contradictory candidate state")
+            raise _LogicalContradiction("logical solver reached a contradictory candidate state")
 
     def _record(self, move: Move) -> Move:
         self.steps.append(move)
@@ -136,7 +175,7 @@ class LogicalState:
             if move:
                 self.contradiction = self._has_contradiction()
                 if self.contradiction:
-                    raise RuntimeError(
+                    raise _LogicalContradiction(
                         f"logical strategy {move.get('strategy', '<unknown>')} produced a contradiction"
                     )
                 return self._record(move)
@@ -153,13 +192,19 @@ class LogicalState:
         for _ in range(max_steps):
             if self.solved():
                 break
-            move = self.step()
+            try:
+                move = self.step()
+            except _LogicalContradiction:
+                # step() deliberately remains strict for callers debugging one
+                # strategy at a time. A full logical run, however, has a public
+                # contradiction result and must return it rather than crash.
+                break
             if move is None:
                 break
         else:
             limit_reached = not self.solved()
 
-        solved = self.solved()
+        solved = self.solved() and not self.contradiction
         stalled = not solved and not self.contradiction and not limit_reached
         return LogicalResult(
             grid=[row[:] for row in self.grid],
@@ -218,6 +263,7 @@ def human_rate(grid: Grid, max_steps: int = 500) -> HumanRating:
             placements=placements,
             eliminations=eliminations,
             hardest_strategy=result.hardest_strategy,
+            contradiction=result.contradiction,
         )
 
     hardest = _STRATEGY_WEIGHT.get(result.hardest_strategy or "", 0.0)
@@ -234,6 +280,7 @@ def human_rate(grid: Grid, max_steps: int = 500) -> HumanRating:
         placements=placements,
         eliminations=eliminations,
         hardest_strategy=result.hardest_strategy,
+        contradiction=False,
     )
 
 
