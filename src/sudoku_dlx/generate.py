@@ -16,9 +16,21 @@ RemovalGroup = tuple[Cell, ...]
 _VALID_SYMMETRIES = {"none", "rot180", "mix"}
 _DEFAULT_GIVENS_BY_DIFFICULTY: dict[HumanDifficulty, int] = {
     "easy": 40,
-    "medium": 34,
-    "hard": 30,
+    "medium": 30,
+    "hard": 28,
     "expert": 26,
+}
+
+# A single clue count is a poor proxy for logical difficulty: at 34 clues the
+# deterministic generator produces overwhelmingly easy puzzles. When callers
+# do not pin target_givens, search a small deterministic profile around the
+# nominal target instead. Explicit target_givens remains exact API input and is
+# never altered by this schedule.
+_DEFAULT_GIVENS_SEARCH: dict[HumanDifficulty, tuple[int, ...]] = {
+    "easy": (40, 42, 38, 44, 36),
+    "medium": (30, 29, 28, 31, 27, 32, 26, 33, 25, 34),
+    "hard": (28, 27, 26, 25, 24, 29, 23, 30, 22),
+    "expert": (26, 25, 24, 23, 22, 21, 20, 19, 18, 17),
 }
 
 
@@ -266,24 +278,29 @@ def generate_rated(
     symmetry: Symmetry = "mix",
     max_attempts: int = 64,
 ) -> GenerationResult:
-    """Generate a puzzle whose deterministic human difficulty label matches the target."""
+    """Generate a puzzle whose deterministic human difficulty label matches the target.
+
+    If ``target_givens`` is omitted, attempts cycle through a small deterministic
+    clue-count profile appropriate to the requested difficulty. If it is supplied,
+    every attempt uses exactly that target as before.
+    """
 
     if human_difficulty not in _DEFAULT_GIVENS_BY_DIFFICULTY:
         raise ValueError("human_difficulty must be one of: easy, medium, hard, expert")
     if type(max_attempts) is not int or max_attempts < 1:
         raise ValueError("max_attempts must be an integer >= 1")
 
-    givens = (
-        _DEFAULT_GIVENS_BY_DIFFICULTY[human_difficulty]
-        if target_givens is None
-        else target_givens
-    )
-    if type(givens) is not int or not 17 <= givens <= 81:
-        raise ValueError("target_givens must be an integer in 17..81")
+    if target_givens is None:
+        givens_schedule = _DEFAULT_GIVENS_SEARCH[human_difficulty]
+    else:
+        if type(target_givens) is not int or not 17 <= target_givens <= 81:
+            raise ValueError("target_givens must be an integer in 17..81")
+        givens_schedule = (target_givens,)
 
     rng = random.Random(seed)
     for attempt in range(1, max_attempts + 1):
         candidate_seed = rng.randrange(2**31 - 1)
+        givens = givens_schedule[(attempt - 1) % len(givens_schedule)]
         grid = generate(
             seed=candidate_seed,
             target_givens=givens,
@@ -291,7 +308,9 @@ def generate_rated(
             symmetry=symmetry,
         )
         human = human_rate(grid)
-        if human.label == human_difficulty:
+        # A strategy contradiction is an internal diagnostic, never a valid
+        # target match (including for "expert"). Continue the bounded search.
+        if not human.contradiction and human.label == human_difficulty:
             # Machine Difficulty v3 requires canonicalization and exact-cover work;
             # defer it until a candidate has actually passed the human target.
             return _finalize_result(
